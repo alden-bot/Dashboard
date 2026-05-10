@@ -1,6 +1,7 @@
 import type { I18nManager } from '@/utils/I18nManager';
 import type { PluginInfo } from '../services/BotService';
 import { renderLayout } from './layout';
+import { escapeHtml } from '../utils/html';
 
 export function renderPlugins(
 	plugins: PluginInfo[],
@@ -26,16 +27,6 @@ export function renderPlugins(
 			</td>
 			<td class="px-4 py-3 text-gray-400 text-sm">${escapeHtml(p.description)}</td>
 			<td class="px-4 py-3 text-gray-500 text-sm">${escapeHtml(p.author)}</td>
-			<td class="px-4 py-3">
-				<button
-					hx-post="/plugins/${escapeHtml(p.name)}/reload"
-					hx-confirm="Reload ${escapeHtml(p.name)}?"
-					hx-swap="outerHTML"
-					class="px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors"
-				>
-					Reload
-				</button>
-			</td>
 		</tr>`,
 		)
 		.join('');
@@ -46,9 +37,21 @@ export function renderPlugins(
 			<p class="text-gray-500 text-sm mt-1">${plugins.length} plugin${plugins.length !== 1 ? 's' : ''} loaded</p>
 		</div>
 
+		<div class="mb-4">
+			<button
+				hx-post="/plugins/reload-all"
+				hx-confirm="Reload all plugins? This may cause brief downtime."
+				hx-swap="innerHTML"
+				hx-target="#plugin-result"
+				class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition-colors shadow-lg shadow-indigo-600/20"
+			>
+				Reload All
+			</button>
+		</div>
+
 		<div id="plugin-result"></div>
 
-		<div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+		<div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-lg">
 			<div class="overflow-x-auto">
 				<table class="w-full">
 					<thead>
@@ -57,11 +60,10 @@ export function renderPlugins(
 							<th class="px-4 py-3 text-xs font-medium text-gray-500 uppercase">Version</th>
 							<th class="px-4 py-3 text-xs font-medium text-gray-500 uppercase">Description</th>
 							<th class="px-4 py-3 text-xs font-medium text-gray-500 uppercase">Author</th>
-							<th class="px-4 py-3 text-xs font-medium text-gray-500 uppercase">Actions</th>
 						</tr>
 					</thead>
 					<tbody>
-						${rows || '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No plugins loaded</td></tr>'}
+						${rows || '<tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">No plugins loaded</td></tr>'}
 					</tbody>
 				</table>
 			</div>
@@ -69,8 +71,4 @@ export function renderPlugins(
 	`;
 
 	return renderLayout('Plugins', content, i18n, lang, true, 'plugins');
-}
-
-function escapeHtml(str: string): string {
-	return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }

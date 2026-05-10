@@ -9,12 +9,12 @@ export function createStatusRoutes(plugin: Main): Hono {
 	const app = new Hono();
 
 	app.use('/status', requireAuth);
+	app.use('/dashboard', requireAuth);
 
 	app.get('/status', (c) => {
 		const session = c.get('session')!;
 		const isAdmin = session.role >= Role.BotAdmin;
 		const status = plugin.botService.getStatus();
-
 		return c.html(renderStatus(status, plugin.i18n!, plugin.bot.config.LANGUAGE, isAdmin));
 	});
 

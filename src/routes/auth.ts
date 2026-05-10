@@ -16,14 +16,14 @@ export function createAuthRoutes(plugin: Main): Hono {
 
 		if (!otp) {
 			return c.html(
-				`<div class="alert alert-error">OTP is required</div>`,
+				`<div class="p-3 rounded-lg text-sm toast-error">OTP is required</div>`,
 			);
 		}
 
 		const userId = plugin.otpManager.verify(otp);
 		if (!userId) {
 			return c.html(
-				`<div class="alert alert-error">Invalid or expired OTP</div>`,
+				`<div class="p-3 rounded-lg text-sm toast-error">Invalid or expired OTP</div>`,
 			);
 		}
 
@@ -39,11 +39,13 @@ export function createAuthRoutes(plugin: Main): Hono {
 		// Revoke any existing sessions for this user before creating new one
 		await plugin.sessionManager.revokeAllForUser(userId);
 
-		const token = await plugin.sessionManager.create(userId, role, groupIds);
+		const { token, csrfToken } = await plugin.sessionManager.create(userId, role, groupIds);
 
-		// Set cookie with Max-Age for persistence across browser restarts
+		// Set session cookie with Max-Age for persistence across browser restarts
 		const maxAge = Math.floor(plugin.config.get('sessionTTL') / 1000);
 		c.header('Set-Cookie', `dashboard_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`);
+		// Set CSRF cookie (not HttpOnly so JS can read it for HTMX headers)
+		c.header('Set-Cookie', `csrf_token=${csrfToken}; Path=/; SameSite=Strict; Max-Age=${maxAge}`, { append: true });
 		return c.redirect('/dashboard');
 	});
 

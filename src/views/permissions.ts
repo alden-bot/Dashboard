@@ -1,6 +1,7 @@
 import type { I18nManager } from '@/utils/I18nManager';
 import type { PermissionNode } from '../services/BotService';
 import { renderLayout } from './layout';
+import { escapeHtml } from '../utils/html';
 
 export function renderPermissions(
 	nodes: PermissionNode[],
@@ -23,7 +24,7 @@ export function renderPermissions(
 			</td>
 			<td class="px-4 py-3">
 				<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${levelColors[n.level] || levelColors[0]}">
-					${n.levelName}
+					${escapeHtml(n.levelName)}
 				</span>
 			</td>
 		</tr>`,
@@ -39,9 +40,9 @@ export function renderPermissions(
 		<div id="perm-result"></div>
 
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-			<div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+			<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-lg">
 				<h3 class="text-sm font-medium text-gray-400 mb-4">Grant Permission</h3>
-				<form hx-post="/permissions/grant" hx-swap="outerHTML" hx-target="#perm-result" class="space-y-3">
+				<form hx-post="/permissions/grant" hx-swap="innerHTML" hx-target="#perm-result" class="space-y-3">
 					<input type="text" name="userId" placeholder="User ID" required
 						class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
 					<input type="text" name="node" placeholder="Permission node (e.g. dashboard.admin)" required
@@ -52,9 +53,9 @@ export function renderPermissions(
 				</form>
 			</div>
 
-			<div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+			<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-lg">
 				<h3 class="text-sm font-medium text-gray-400 mb-4">Revoke Permission</h3>
-				<form hx-post="/permissions/revoke" hx-swap="outerHTML" hx-target="#perm-result" class="space-y-3">
+				<form hx-post="/permissions/revoke" hx-swap="innerHTML" hx-target="#perm-result" class="space-y-3">
 					<input type="text" name="userId" placeholder="User ID" required
 						class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
 					<input type="text" name="node" placeholder="Permission node" required
@@ -65,9 +66,9 @@ export function renderPermissions(
 				</form>
 			</div>
 
-			<div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+			<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-lg">
 				<h3 class="text-sm font-medium text-gray-400 mb-4">Add Virtual Deputy</h3>
-				<form hx-post="/permissions/deputy/add" hx-swap="outerHTML" hx-target="#perm-result" class="space-y-3">
+				<form hx-post="/permissions/deputy/add" hx-swap="innerHTML" hx-target="#perm-result" class="space-y-3">
 					<input type="text" name="threadId" placeholder="Group Thread ID" required
 						class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
 					<input type="text" name="userId" placeholder="User ID" required
@@ -78,9 +79,9 @@ export function renderPermissions(
 				</form>
 			</div>
 
-			<div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+			<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-lg">
 				<h3 class="text-sm font-medium text-gray-400 mb-4">Remove Virtual Deputy</h3>
-				<form hx-post="/permissions/deputy/remove" hx-swap="outerHTML" hx-target="#perm-result" class="space-y-3">
+				<form hx-post="/permissions/deputy/remove" hx-swap="innerHTML" hx-target="#perm-result" class="space-y-3">
 					<input type="text" name="threadId" placeholder="Group Thread ID" required
 						class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
 					<input type="text" name="userId" placeholder="User ID" required
@@ -92,7 +93,7 @@ export function renderPermissions(
 			</div>
 		</div>
 
-		<div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+		<div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-lg">
 			<div class="px-4 py-3 border-b border-gray-800">
 				<h3 class="text-sm font-medium text-gray-400">Permission Nodes (${nodes.length})</h3>
 			</div>
@@ -113,8 +114,4 @@ export function renderPermissions(
 	`;
 
 	return renderLayout('Permissions', content, i18n, lang, true, 'permissions');
-}
-
-function escapeHtml(str: string): string {
-	return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }

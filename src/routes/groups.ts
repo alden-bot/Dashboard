@@ -3,8 +3,7 @@ import type Main from '../main';
 import { requireAuth } from '../auth/middleware';
 import { Role } from '@/core/permission/PermissionManager';
 import { renderGroups } from '../views/groups';
-import { renderGroupDetail } from '../views/group-detail';
-import { escapeHtml } from '../utils/html';
+import { renderGroupDetail, renderInviteCard } from '../views/group-detail';
 
 export function createGroupRoutes(plugin: Main): Hono {
 	const app = new Hono();
@@ -56,8 +55,8 @@ export function createGroupRoutes(plugin: Main): Hono {
 
 		const success = await plugin.groupService.kickMember(threadId, userId);
 		return c.html(success
-			? `<div class="alert alert-success">Member kicked</div>`
-			: `<div class="alert alert-error">Failed to kick member</div>`,
+			? `<div class="p-3 rounded-lg text-sm toast-success">Member kicked</div>`
+			: `<div class="p-3 rounded-lg text-sm toast-error">Failed to kick member</div>`,
 		);
 	});
 
@@ -72,8 +71,8 @@ export function createGroupRoutes(plugin: Main): Hono {
 
 		const success = await plugin.groupService.banMember(threadId, userId);
 		return c.html(success
-			? `<div class="alert alert-success">Member banned</div>`
-			: `<div class="alert alert-error">Failed to ban member</div>`,
+			? `<div class="p-3 rounded-lg text-sm toast-success">Member banned</div>`
+			: `<div class="p-3 rounded-lg text-sm toast-error">Failed to ban member</div>`,
 		);
 	});
 
@@ -88,8 +87,8 @@ export function createGroupRoutes(plugin: Main): Hono {
 
 		const success = await plugin.groupService.unbanMember(threadId, userId);
 		return c.html(success
-			? `<div class="alert alert-success">Member unbanned</div>`
-			: `<div class="alert alert-error">Failed to unban member</div>`,
+			? `<div class="p-3 rounded-lg text-sm toast-success">Member unbanned</div>`
+			: `<div class="p-3 rounded-lg text-sm toast-error">Failed to unban member</div>`,
 		);
 	});
 
@@ -102,10 +101,10 @@ export function createGroupRoutes(plugin: Main): Hono {
 			return c.text('Forbidden', 403);
 		}
 
-		const success = await plugin.groupService.addDeputy(threadId, userId);
+		const success = await plugin.botService.addVirtualDeputy(threadId, userId);
 		return c.html(success
-			? `<div class="alert alert-success">Deputy added</div>`
-			: `<div class="alert alert-error">Failed to add deputy</div>`,
+			? `<div class="p-3 rounded-lg text-sm toast-success">vDeputy added</div>`
+			: `<div class="p-3 rounded-lg text-sm toast-error">Failed to add vDeputy</div>`,
 		);
 	});
 
@@ -118,10 +117,10 @@ export function createGroupRoutes(plugin: Main): Hono {
 			return c.text('Forbidden', 403);
 		}
 
-		const success = await plugin.groupService.removeDeputy(threadId, userId);
+		const success = await plugin.botService.removeVirtualDeputy(threadId, userId);
 		return c.html(success
-			? `<div class="alert alert-success">Deputy removed</div>`
-			: `<div class="alert alert-error">Failed to remove deputy</div>`,
+			? `<div class="p-3 rounded-lg text-sm toast-success">vDeputy removed</div>`
+			: `<div class="p-3 rounded-lg text-sm toast-error">Failed to remove vDeputy</div>`,
 		);
 	});
 
@@ -137,8 +136,8 @@ export function createGroupRoutes(plugin: Main): Hono {
 
 		const success = await plugin.groupService.changeName(threadId, name);
 		return c.html(success
-			? `<div class="alert alert-success">Group name changed</div>`
-			: `<div class="alert alert-error">Failed to change group name</div>`,
+			? `<div class="p-3 rounded-lg text-sm toast-success">Group name changed</div>`
+			: `<div class="p-3 rounded-lg text-sm toast-error">Failed to change group name</div>`,
 		);
 	});
 
@@ -151,15 +150,8 @@ export function createGroupRoutes(plugin: Main): Hono {
 		}
 
 		const link = await plugin.groupService.enableLink(threadId);
-		if (link) {
-			return c.html(`
-				<div class="p-3 bg-gray-800 rounded-lg">
-					<p class="text-xs text-gray-400 mb-1">Invite Link:</p>
-					<p class="text-sm text-indigo-400 break-all">${escapeHtml(link)}</p>
-				</div>
-			`);
-		}
-		return c.html(`<div class="text-sm text-red-400">Failed to enable link</div>`);
+		const savedLink = link || plugin.groupService.getSavedLink(threadId);
+		return c.html(renderInviteCard(threadId, savedLink));
 	});
 
 	app.post('/groups/:id/link/refresh', async (c) => {
@@ -171,15 +163,8 @@ export function createGroupRoutes(plugin: Main): Hono {
 		}
 
 		const link = await plugin.groupService.enableLink(threadId);
-		if (link) {
-			return c.html(`
-				<div class="p-3 bg-gray-800 rounded-lg">
-					<p class="text-xs text-gray-400 mb-1">New Invite Link:</p>
-					<p class="text-sm text-indigo-400 break-all">${escapeHtml(link)}</p>
-				</div>
-			`);
-		}
-		return c.html(`<div class="text-sm text-red-400">Failed to refresh link</div>`);
+		const savedLink = link || plugin.groupService.getSavedLink(threadId);
+		return c.html(renderInviteCard(threadId, savedLink));
 	});
 
 	app.post('/groups/:id/link/disable', async (c) => {
@@ -190,11 +175,33 @@ export function createGroupRoutes(plugin: Main): Hono {
 			return c.text('Forbidden', 403);
 		}
 
-		const success = await plugin.groupService.disableLink(threadId);
-		return c.html(success
-			? `<div class="text-sm text-green-400">Invite link disabled</div>`
-			: `<div class="text-sm text-red-400">Failed to disable link</div>`,
-		);
+		await plugin.groupService.disableLink(threadId);
+		return c.html(renderInviteCard(threadId));
+	});
+
+	app.get('/groups/:id/members/:uid/detail', async (c) => {
+		const session = c.get('session')!;
+		const threadId = c.req.param('id');
+		const userId = c.req.param('uid');
+
+		if (!canManageGroup(session, threadId)) {
+			return c.text('Forbidden', 403);
+		}
+
+		const role = await plugin.bot.permissionManager.getRoleLevel(threadId, userId, true);
+		const roleName = Role[role] ?? 'Member';
+		const perms = plugin.bot.permissionManager.getUserPermissions(userId);
+		const isVirtualDeputy = plugin.bot.permissionManager['virtualDeputies']
+			?.get(threadId)
+			?.has(userId) ?? false;
+
+		return c.html(`
+			<div class="mt-2 p-3 bg-gray-800/50 rounded-lg border border-gray-700 text-sm space-y-1">
+				<div class="flex justify-between"><span class="text-gray-400">Role:</span><span class="text-white">${roleName}</span></div>
+				<div class="flex justify-between"><span class="text-gray-400">Virtual Deputy:</span><span class="text-white">${isVirtualDeputy ? 'Yes' : 'No'}</span></div>
+				<div class="flex justify-between"><span class="text-gray-400">Permissions:</span><span class="text-white">${perms.length > 0 ? perms.join(', ') : 'None'}</span></div>
+			</div>
+		`);
 	});
 
 	function canManageGroup(session: { role: number; groupIds: string[] }, threadId: string): boolean {

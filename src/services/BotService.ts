@@ -1,4 +1,5 @@
 import os from 'node:os';
+import { PATH } from '@/config/constants';
 import type Main from '../main';
 import { Role } from '@/core/permission/PermissionManager';
 import { formatUptime } from '@/utils/format';
@@ -72,7 +73,7 @@ export class BotService {
 				version: plugin.description.version,
 				description: plugin.description.description,
 				author: plugin.description.author,
-				enabled: true,
+				enabled: this.plugin.bot.pluginManager.isPluginEnabled(name),
 			});
 		}
 
@@ -80,26 +81,14 @@ export class BotService {
 	}
 
 	/**
-	 * Reload a plugin by name.
+	 * Reload all plugins.
 	 */
-	public async reloadPlugin(name: string): Promise<boolean> {
+	public async reloadAll(): Promise<boolean> {
 		try {
 			const pm = this.plugin.bot.pluginManager;
-			const plugin = pm.getPlugin(name);
-			if (!plugin) return false;
-
-			const targetDir = plugin.pluginPath;
-			const unloaded = await pm.unloadPlugin(name);
-			if (!unloaded) return false;
-
-			const loaded = await pm.loadPlugin(targetDir);
-			if (!loaded) return false;
-
-			const reloaded = pm.getPlugin(name);
-			if (reloaded) {
-				await reloaded.onEnable();
-			}
-
+			await pm.unloadAll();
+			await pm.loadAll(PATH.PLUGINS_DIR);
+			await pm.enableAll();
 			return true;
 		} catch {
 			return false;

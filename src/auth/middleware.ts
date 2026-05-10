@@ -13,7 +13,7 @@ declare module 'hono' {
 
 /**
  * Auth middleware: validates session cookie and attaches session to context.
- * Also generates a CSRF token for authenticated sessions.
+ * Sets CSRF cookie if missing (handles legacy sessions without csrfToken).
  */
 export function createAuthMiddleware(plugin: Main) {
 	return async (c: Context, next: Next): Promise<void> => {
@@ -24,13 +24,21 @@ export function createAuthMiddleware(plugin: Main) {
 			c.set('session', session);
 
 			if (session) {
-				// Generate CSRF token and attach to context + cookie
-				const csrfToken = randomBytes(32).toString('hex');
-				c.set('csrfToken', csrfToken);
-				c.header(
-					'Set-Cookie',
-					`csrf_token=${csrfToken}; Path=/; HttpOnly; SameSite=Strict`,
-				);
+				// Generate CSRF token if session doesn't have one (legacy sessions)
+				if (!session.csrfToken) {
+					session.csrfToken = randomBytes(32).toString('hex');
+				}
+				c.set('csrfToken', session.csrfToken);
+
+				// Always set CSRF cookie if missing from browser
+				const existingCsrf = getCookie(c, 'csrf_token');
+				if (!existingCsrf) {
+					const maxAge = Math.floor(plugin.config.get('sessionTTL') / 1000);
+					c.header(
+						'Set-Cookie',
+						`csrf_token=${session.csrfToken}; Path=/; SameSite=Strict; Max-Age=${maxAge}`,
+					);
+				}
 			}
 		} else {
 			c.set('session', undefined);
@@ -43,7 +51,7 @@ export function createAuthMiddleware(plugin: Main) {
 /**
  * CSRF protection middleware for POST requests.
  * Validates the `X-CSRF-Token` header against the `csrf_token` cookie.
- * Only applies to authenticated sessions (login POST is exempt).
+ * Only applies when both cookie and header are present (graceful for legacy sessions).
  */
 export async function csrfProtection(c: Context, next: Next): Promise<Response | void> {
 	if (c.req.method === 'POST') {
@@ -52,8 +60,12 @@ export async function csrfProtection(c: Context, next: Next): Promise<Response |
 			const cookieToken = getCookie(c, 'csrf_token');
 			const headerToken = c.req.header('X-CSRF-Token');
 
-			if (!cookieToken || !headerToken || cookieToken !== headerToken) {
-				return c.text('CSRF token mismatch', 403);
+			// Only enforce if both cookie AND header are present
+			// Skip if cookie is missing (legacy session, first request after CSRF was added)
+			if (cookieToken && headerToken) {
+				if (cookieToken !== headerToken) {
+					return c.text('CSRF token mismatch', 403);
+				}
 			}
 		}
 	}
@@ -80,10 +92,7 @@ export async function requireAdmin(c: Context, next: Next): Promise<Response | v
 		return c.redirect('/login');
 	}
 	if (session.role < Role.BotAdmin) {
-		return c.html(
-			renderForbidden(),
-			403,
-		);
+		return c.html(renderForbidden(), 403);
 	}
 	await next();
 }

@@ -1,6 +1,44 @@
 import type { I18nManager } from '@/utils/I18nManager';
 import type { GroupInfo, GroupMember } from '../services/GroupService';
 import { renderLayout } from './layout';
+import { escapeHtml } from '../utils/html';
+
+export function renderInviteCard(threadId: string, savedLink?: string): string {
+	return `
+		<div id="invite-card" class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-lg">
+			<h3 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Invite Link</h3>
+			${
+				savedLink
+					? `
+				<div class="p-3 bg-gray-800 rounded-lg mb-3">
+					<p class="text-xs text-gray-400 mb-1">Current Link:</p>
+					<p class="text-sm text-indigo-400 break-all">${escapeHtml(savedLink)}</p>
+				</div>
+			`
+					: ''
+			}
+			<div class="flex gap-2">
+				<button hx-post="/groups/${threadId}/link/enable" hx-swap="outerHTML" hx-target="#invite-card"
+					class="flex-1 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition-colors">
+					${savedLink ? 'New Link' : 'Enable'}
+				</button>
+				${
+					savedLink
+						? `
+					<button hx-post="/groups/${threadId}/link/refresh" hx-swap="outerHTML" hx-target="#invite-card"
+						class="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition-colors">
+						Refresh
+					</button>
+				`
+						: ''
+				}
+				<button hx-post="/groups/${threadId}/link/disable" hx-swap="outerHTML" hx-target="#invite-card"
+					class="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition-colors">
+					Disable
+				</button>
+			</div>
+		</div>`;
+}
 
 export function renderGroupDetail(
 	group: GroupInfo,
@@ -21,33 +59,57 @@ export function renderGroupDetail(
 	const memberRows = members
 		.map((m) => {
 			let role = 'Member';
-			// if (m.isBot) role = 'Bot';
 			if (m.isCreator) role = 'Leader';
 			else if (m.isAdmin) role = 'Deputy';
 			else if (m.isDeputy) role = 'vDeputy';
+			else if (m.isBot) role = 'Bot';
 
 			const badgeClass = roleColors[role] || roleColors['Member'];
 			const botTag = m.isBot
 				? '<span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-600 text-white">BOT</span>'
 				: '';
 
-			const actions =
-				m.isCreator || m.isBot
-					? ''
-					: `
+			const isMember = role === 'Member';
+
+			const actions = isMember
+				? `
 				<div class="flex gap-1">
+					<button
+						hx-post="/groups/${group.threadId}/deputies/${m.userId}/add"
+						hx-confirm="Grant vDeputy to ${escapeHtml(m.displayName)}?"
+						hx-swap="innerHTML"
+						hx-target="#action-result"
+						class="px-2 py-1 text-xs bg-indigo-900/50 hover:bg-indigo-900 text-indigo-400 rounded transition-colors"
+					>Grant vDeputy</button>
 					<button
 						hx-post="/groups/${group.threadId}/members/${m.userId}/kick"
 						hx-confirm="Kick ${escapeHtml(m.displayName)}?"
-						hx-swap="outerHTML"
+						hx-swap="innerHTML"
+						hx-target="#action-result"
 						class="px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors"
 					>Kick</button>
 					<button
 						hx-post="/groups/${group.threadId}/members/${m.userId}/ban"
 						hx-confirm="Ban ${escapeHtml(m.displayName)}?"
-						hx-swap="outerHTML"
+						hx-swap="innerHTML"
+						hx-target="#action-result"
 						class="px-2 py-1 text-xs bg-red-900/50 hover:bg-red-900 text-red-400 rounded transition-colors"
 					>Ban</button>
+					<button
+						hx-get="/groups/${group.threadId}/members/${m.userId}/detail"
+						hx-swap="innerHTML"
+						hx-target="#member-detail-${m.userId}"
+						class="px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors"
+					>Details</button>
+				</div>`
+				: `
+				<div class="flex gap-1">
+					<button
+						hx-get="/groups/${group.threadId}/members/${m.userId}/detail"
+						hx-swap="innerHTML"
+						hx-target="#member-detail-${m.userId}"
+						class="px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors"
+					>Details</button>
 				</div>`;
 
 			const avatarHtml = m.avatar
@@ -72,10 +134,15 @@ export function renderGroupDetail(
 				</td>
 				<td class="px-4 py-3">
 					<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${badgeClass}">
-						${role}
+						${escapeHtml(role)}
 					</span>
 				</td>
 				<td class="px-4 py-3 text-right">${actions}</td>
+			</tr>
+			<tr>
+				<td colspan="3" class="px-4 py-0">
+					<div id="member-detail-${m.userId}" class="pb-2"></div>
+				</td>
 			</tr>`;
 		})
 		.join('');
@@ -88,7 +155,7 @@ export function renderGroupDetail(
 		</div>
 
 		<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-			<div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+			<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-lg">
 				<h3 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Group Info</h3>
 				<div class="space-y-2 text-sm">
 					<div class="flex justify-between">
@@ -106,7 +173,7 @@ export function renderGroupDetail(
 				</div>
 			</div>
 
-			<div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+			<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-lg">
 				<h3 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Change Name</h3>
 				<form hx-post="/groups/${group.threadId}/name" hx-swap="innerHTML" hx-target="#name-result" class="flex gap-2">
 					<input type="text" name="name" placeholder="New name" required
@@ -118,45 +185,12 @@ export function renderGroupDetail(
 				<div id="name-result" class="mt-2"></div>
 			</div>
 
-			<div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
-				<h3 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Invite Link</h3>
-				${
-					savedLink
-						? `
-					<div class="p-3 bg-gray-800 rounded-lg mb-3">
-						<p class="text-xs text-gray-400 mb-1">Current Link:</p>
-						<p class="text-sm text-indigo-400 break-all">${escapeHtml(savedLink)}</p>
-					</div>
-				`
-						: ''
-				}
-				<div class="flex gap-2">
-					<button hx-post="/groups/${group.threadId}/link/enable" hx-swap="innerHTML" hx-target="#link-result"
-						class="flex-1 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition-colors">
-						${savedLink ? 'New Link' : 'Enable'}
-					</button>
-					${
-						savedLink
-							? `
-						<button hx-post="/groups/${group.threadId}/link/refresh" hx-swap="innerHTML" hx-target="#link-result"
-							class="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition-colors">
-							Refresh
-						</button>
-					`
-							: ''
-					}
-					<button hx-post="/groups/${group.threadId}/link/disable" hx-swap="innerHTML" hx-target="#link-result"
-						class="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition-colors">
-						Disable
-					</button>
-				</div>
-				<div id="link-result" class="mt-2"></div>
-			</div>
+			${renderInviteCard(group.threadId, savedLink)}
 		</div>
 
-		<div id="action-result"></div>
+		<div id="action-result" class="mb-4"></div>
 
-		<div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+		<div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-lg">
 			<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 				<h3 class="text-sm font-medium text-gray-400">Members</h3>
 				<span class="text-xs text-gray-600">${members.length} total</span>
@@ -179,12 +213,4 @@ export function renderGroupDetail(
 	`;
 
 	return renderLayout(group.name, content, i18n, lang, isAdmin, 'groups');
-}
-
-function escapeHtml(str: string): string {
-	return str
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;');
 }

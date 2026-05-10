@@ -9,15 +9,16 @@ export interface Session {
 	groupIds: string[];
 	createdAt: number;
 	expiresAt: number;
+	csrfToken: string;
 }
 
 interface StoredSession {
-	hash: string;
 	userId: string;
 	role: Role;
 	groupIds: string[];
 	createdAt: number;
 	expiresAt: number;
+	csrfToken: string;
 }
 
 interface SessionFile {
@@ -50,6 +51,7 @@ export class SessionManager {
 					groupIds: stored.groupIds,
 					createdAt: stored.createdAt,
 					expiresAt: stored.expiresAt,
+					csrfToken: stored.csrfToken,
 				});
 			}
 		}
@@ -57,14 +59,14 @@ export class SessionManager {
 
 	public async save(): Promise<void> {
 		const sessions: Record<string, StoredSession> = {};
-		for (const [hash, session] of this.sessions) {
-			sessions[hash] = {
-				hash,
+		for (const [, session] of this.sessions) {
+			sessions[session.token] = {
 				userId: session.userId,
 				role: session.role,
 				groupIds: session.groupIds,
 				createdAt: session.createdAt,
 				expiresAt: session.expiresAt,
+				csrfToken: session.csrfToken,
 			};
 		}
 		await writeJsonFileAsync(this.dataPath, { sessions });
@@ -77,7 +79,7 @@ export class SessionManager {
 		userId: string,
 		role: Role,
 		groupIds: string[],
-	): Promise<string> {
+	): Promise<{ token: string; csrfToken: string }> {
 		// Enforce max sessions
 		if (this.sessions.size >= this.maxSessions) {
 			this.evictOldest();
@@ -85,6 +87,7 @@ export class SessionManager {
 
 		const token = randomBytes(32).toString('hex');
 		const hash = this.hashToken(token);
+		const csrfToken = randomBytes(32).toString('hex');
 
 		const now = Date.now();
 		this.sessions.set(hash, {
@@ -94,10 +97,11 @@ export class SessionManager {
 			groupIds,
 			createdAt: now,
 			expiresAt: now + this.ttlMs,
+			csrfToken,
 		});
 
 		await this.save();
-		return token;
+		return { token, csrfToken };
 	}
 
 	/**

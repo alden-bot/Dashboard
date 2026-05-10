@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type Main from '../main';
 import { requireAdmin } from '../auth/middleware';
 import { renderPlugins } from '../views/plugins';
-import { escapeHtml } from '../utils/html';
+
 
 export function createPluginRoutes(plugin: Main): Hono {
 	const app = new Hono();
@@ -11,18 +11,18 @@ export function createPluginRoutes(plugin: Main): Hono {
 
 	app.get('/plugins', (c) => {
 		const plugins = plugin.botService.getPlugins();
-
 		return c.html(renderPlugins(plugins, plugin.i18n!, plugin.bot.config.LANGUAGE));
 	});
 
-	app.post('/plugins/:name/reload', async (c) => {
-		const name = c.req.param('name');
-		const success = await plugin.botService.reloadPlugin(name);
-
-		return c.html(success
-			? `<div class="alert alert-success">Plugin "${escapeHtml(name)}" reloaded</div>`
-			: `<div class="alert alert-error">Failed to reload plugin "${escapeHtml(name)}"</div>`,
-		);
+	app.post('/plugins/reload-all', async (c) => {
+		const success = await plugin.botService.reloadAll();
+		if (success) {
+			const count = plugin.bot.pluginManager.getPlugins().size;
+			return c.html(
+				`<div class="p-3 rounded-lg text-sm toast-success">Reloaded ${count} plugins successfully</div>`,
+			);
+		}
+		return c.html(`<div class="p-3 rounded-lg text-sm toast-error">Failed to reload plugins</div>`);
 	});
 
 	return app;

@@ -47,7 +47,6 @@ export default class Main extends PluginBase {
 	public groupTracker!: GroupTracker;
 	public groupService!: GroupService;
 	public botService!: BotService;
-	
 
 	private server?: ReturnType<typeof serve>;
 	private app!: Hono;
@@ -161,7 +160,6 @@ export default class Main extends PluginBase {
 	private async onMessage(event: MessageEvent): Promise<void> {
 		const msg = event.message;
 
-		// Buffer for feed only (group tracking now uses getAllGroups API)
 		const feedEntry: Record<string, unknown> = {
 			threadId: msg.threadId,
 			uidFrom: msg.data.uidFrom,
@@ -176,14 +174,16 @@ export default class Main extends PluginBase {
 			this.feedBuffer.shift();
 		}
 
-		// Notify all connected SSE subscribers
+		const broken: Array<(entry: Record<string, unknown>) => void> = [];
 		for (const callback of this.feedSubscribers) {
 			try {
 				callback(feedEntry);
 			} catch {
-				// Remove broken subscriber
-				this.feedSubscribers.delete(callback);
+				broken.push(callback);
 			}
+		}
+		for (const cb of broken) {
+			this.feedSubscribers.delete(cb);
 		}
 	}
 

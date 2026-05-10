@@ -1,7 +1,6 @@
 import { randomInt, createHash } from 'node:crypto';
 
 interface OTPEntry {
-	code: string;
 	userId: string;
 	expiresAt: number;
 }
@@ -23,7 +22,6 @@ export class OTPManager {
 		const hash = this.hash(code);
 
 		this.otps.set(hash, {
-			code: hash,
 			userId,
 			expiresAt: Date.now() + this.ttlMs,
 		});

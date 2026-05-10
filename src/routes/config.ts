@@ -15,11 +15,9 @@ export function createConfigRoutes(plugin: Main): Hono {
 	});
 
 	app.post('/config', async (c) => {
-		// Note: All config changes require a restart to take effect
 		return c.html(`
-			<div class="alert alert-warning">
+			<div class="p-3 rounded-lg text-sm bg-yellow-900/50 border border-yellow-600 text-yellow-200">
 				Config changes require a bot restart to take effect.
-				Please restart the bot to apply changes.
 			</div>
 		`);
 	});

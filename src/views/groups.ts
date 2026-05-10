@@ -1,6 +1,7 @@
 import type { I18nManager } from '@/utils/I18nManager';
 import type { GroupInfo } from '../services/GroupService';
 import { renderLayout } from './layout';
+import { escapeHtml } from '../utils/html';
 
 export function renderGroups(
 	groups: GroupInfo[],
@@ -30,7 +31,7 @@ export function renderGroups(
 			<p class="text-gray-500 text-sm mt-1">${groups.length} group${groups.length !== 1 ? 's' : ''} tracked</p>
 		</div>
 
-		<div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+		<div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-lg">
 			<div class="overflow-x-auto">
 				<table class="w-full">
 					<thead>
@@ -50,8 +51,4 @@ export function renderGroups(
 	`;
 
 	return renderLayout('Groups', content, i18n, lang, isAdmin, 'groups');
-}
-
-function escapeHtml(str: string): string {
-	return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
