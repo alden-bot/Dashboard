@@ -120,6 +120,14 @@ export function renderLayout(
 			sidebar.classList.toggle('-translate-x-full');
 			overlay.classList.toggle('hidden');
 		}
+
+		// Include CSRF token on all HTMX requests
+		document.addEventListener('htmx:configRequest', (e) => {
+			const match = document.cookie.match(/csrf_token=([^;]+)/);
+			if (match) {
+				e.detail.headers['X-CSRF-Token'] = match[1];
+			}
+		});
 	</script>
 </body>
 </html>`;

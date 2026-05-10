@@ -113,6 +113,8 @@ export class SessionManager {
 			return undefined;
 		}
 
+		// Extend session on use (sliding window) — persisted on next save cycle
+		session.expiresAt = Date.now() + this.ttlMs;
 		return session;
 	}
 

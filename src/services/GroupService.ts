@@ -191,7 +191,8 @@ export class GroupService {
 		try {
 			await this.plugin.bot.api.removeUserFromGroup(userId, threadId);
 			return true;
-		} catch {
+		} catch (error) {
+			this.plugin.logger.error(`Failed to kick ${userId} from ${threadId}`, error);
 			return false;
 		}
 	}
@@ -203,7 +204,8 @@ export class GroupService {
 		try {
 			await this.plugin.bot.api.addGroupBlockedMember(userId, threadId);
 			return true;
-		} catch {
+		} catch (error) {
+			this.plugin.logger.error(`Failed to ban ${userId} from ${threadId}`, error);
 			return false;
 		}
 	}
@@ -215,7 +217,8 @@ export class GroupService {
 		try {
 			await this.plugin.bot.api.removeGroupBlockedMember(userId, threadId);
 			return true;
-		} catch {
+		} catch (error) {
+			this.plugin.logger.error(`Failed to unban ${userId} from ${threadId}`, error);
 			return false;
 		}
 	}
@@ -227,7 +230,8 @@ export class GroupService {
 		try {
 			await this.plugin.bot.api.addGroupDeputy(userId, threadId);
 			return true;
-		} catch {
+		} catch (error) {
+			this.plugin.logger.error(`Failed to add deputy ${userId} in ${threadId}`, error);
 			return false;
 		}
 	}
@@ -239,7 +243,8 @@ export class GroupService {
 		try {
 			await this.plugin.bot.api.removeGroupDeputy(userId, threadId);
 			return true;
-		} catch {
+		} catch (error) {
+			this.plugin.logger.error(`Failed to remove deputy ${userId} from ${threadId}`, error);
 			return false;
 		}
 	}
@@ -251,7 +256,8 @@ export class GroupService {
 		try {
 			await this.plugin.bot.api.changeGroupName(name, threadId);
 			return true;
-		} catch {
+		} catch (error) {
+			this.plugin.logger.error(`Failed to change name for ${threadId}`, error);
 			return false;
 		}
 	}
@@ -274,7 +280,8 @@ export class GroupService {
 				await this.saveLinks();
 			}
 			return result?.link;
-		} catch {
+		} catch (error) {
+			this.plugin.logger.error(`Failed to enable link for ${threadId}`, error);
 			return undefined;
 		}
 	}
@@ -288,7 +295,8 @@ export class GroupService {
 			this.groupLinks.delete(threadId);
 			await this.saveLinks();
 			return true;
-		} catch {
+		} catch (error) {
+			this.plugin.logger.error(`Failed to disable link for ${threadId}`, error);
 			return false;
 		}
 	}

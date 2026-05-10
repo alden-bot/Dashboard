@@ -8,7 +8,7 @@ import { I18nManager } from '@/utils/I18nManager';
 import { DashboardCommand } from './commands/DashboardCommand';
 import { OTPManager } from './auth/OTPManager';
 import { SessionManager } from './auth/SessionManager';
-import { createAuthMiddleware } from './auth/middleware';
+import { createAuthMiddleware, csrfProtection } from './auth/middleware';
 import { GroupTracker } from './services/GroupTracker';
 import { GroupService } from './services/GroupService';
 import { BotService } from './services/BotService';
@@ -136,6 +136,7 @@ export default class Main extends PluginBase {
 	private setupMiddleware(): void {
 		this.app.use('*', cors());
 		this.app.use('*', createAuthMiddleware(this));
+		this.app.use('*', csrfProtection);
 	}
 
 	private setupRoutes(): void {
