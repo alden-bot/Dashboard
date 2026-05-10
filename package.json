@@ -1,0 +1,9 @@
+{
+	"name": "dashboard-plugin",
+	"version": "1.0.0",
+	"private": true,
+	"dependencies": {
+		"hono": "^4.7.0",
+		"@hono/node-server": "^1.13.0"
+	}
+}

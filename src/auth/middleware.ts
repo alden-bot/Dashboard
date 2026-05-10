@@ -1,0 +1,92 @@
+import type { Context, Next } from 'hono';
+import type { Session } from './SessionManager';
+import type Main from '../main';
+import { Role } from '@/core/permission/PermissionManager';
+
+declare module 'hono' {
+	interface ContextVariableMap {
+		session: Session | undefined;
+	}
+}
+
+/**
+ * Auth middleware: validates session cookie and attaches session to context.
+ */
+export function createAuthMiddleware(plugin: Main) {
+	return async (c: Context, next: Next): Promise<void> => {
+		const token = getCookie(c, 'dashboard_session');
+
+		if (token) {
+			const session = plugin.sessionManager.validate(token);
+			c.set('session', session);
+		} else {
+			c.set('session', undefined);
+		}
+
+		await next();
+	};
+}
+
+/**
+ * Require authentication. Redirects to /login if not authenticated.
+ */
+export async function requireAuth(c: Context, next: Next): Promise<Response | void> {
+	const session = c.get('session');
+	if (!session) {
+		return c.redirect('/login');
+	}
+	await next();
+}
+
+/**
+ * Require BotAdmin role.
+ */
+export async function requireAdmin(c: Context, next: Next): Promise<Response | void> {
+	const session = c.get('session');
+	if (!session) {
+		return c.redirect('/login');
+	}
+	if (session.role < Role.BotAdmin) {
+		return c.html(
+			renderForbidden(),
+			403,
+		);
+	}
+	await next();
+}
+
+function renderForbidden(): string {
+	return `<!DOCTYPE html>
+<html class="h-full">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>403 - Forbidden</title>
+	<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="h-full bg-gray-950 flex items-center justify-center">
+	<div class="text-center">
+		<h1 class="text-6xl font-bold text-gray-600">403</h1>
+		<p class="text-gray-400 mt-4">You don't have permission to access this page.</p>
+		<a href="/dashboard" class="inline-block mt-6 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">
+			Back to Dashboard
+		</a>
+	</div>
+</body>
+</html>`;
+}
+
+/**
+ * Get cookie value by name.
+ */
+function getCookie(c: Context, name: string): string | undefined {
+	const cookies = c.req.header('cookie');
+	if (!cookies) return undefined;
+
+	for (const cookie of cookies.split(';')) {
+		const [key, value] = cookie.trim().split('=');
+		if (key === name) return value;
+	}
+
+	return undefined;
+}
