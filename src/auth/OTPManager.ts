@@ -14,11 +14,11 @@ export class OTPManager {
 	}
 
 	/**
-	 * Generate a 6-digit OTP for a user.
+	 * Generate an 8-digit OTP for a user.
 	 * Returns the plain OTP code (to send in DM).
 	 */
 	public generate(userId: string): string {
-		const code = randomInt(100000, 999999).toString();
+		const code = randomInt(10000000, 99999999).toString();
 		const hash = this.hash(code);
 
 		this.otps.set(hash, {

@@ -191,9 +191,7 @@ export function createGroupRoutes(plugin: Main): Hono {
 		const role = await plugin.bot.permissionManager.getRoleLevel(threadId, userId, true);
 		const roleName = Role[role] ?? 'Member';
 		const perms = plugin.bot.permissionManager.getUserPermissions(userId);
-		const isVirtualDeputy = plugin.bot.permissionManager['virtualDeputies']
-			?.get(threadId)
-			?.has(userId) ?? false;
+		const isVirtualDeputy = plugin.bot.permissionManager.isVirtualDeputy(threadId, userId);
 
 		return c.html(`
 			<div class="mt-2 p-3 bg-gray-800/50 rounded-lg border border-gray-700 text-sm space-y-1">

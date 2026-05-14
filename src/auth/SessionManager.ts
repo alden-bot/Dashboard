@@ -157,7 +157,7 @@ export class SessionManager {
 				this.sessions.delete(hash);
 			}
 		}
-		void this.save();
+		this.save().catch((err) => console.error('Session save failed during cleanup', err));
 	}
 
 	private evictOldest(): void {

@@ -54,18 +54,19 @@ export function createAuthMiddleware(plugin: Main) {
  * Only applies when both cookie and header are present (graceful for legacy sessions).
  */
 export async function csrfProtection(c: Context, next: Next): Promise<Response | void> {
-	if (c.req.method === 'POST') {
+	const method = c.req.method;
+	if (method === 'POST' || method === 'PUT' || method === 'DELETE') {
 		const session = c.get('session');
 		if (session) {
 			const cookieToken = getCookie(c, 'csrf_token');
 			const headerToken = c.req.header('X-CSRF-Token');
 
-			// Only enforce if both cookie AND header are present
-			// Skip if cookie is missing (legacy session, first request after CSRF was added)
-			if (cookieToken && headerToken) {
-				if (cookieToken !== headerToken) {
-					return c.text('CSRF token mismatch', 403);
-				}
+			if (!headerToken) {
+				return c.text('CSRF token missing', 403);
+			}
+
+			if (cookieToken && cookieToken !== headerToken) {
+				return c.text('CSRF token mismatch', 403);
 			}
 		}
 	}
