@@ -103,7 +103,8 @@ export function createAuthRoutes(plugin: Main): Hono {
 		}
 		c.header('Set-Cookie', 'dashboard_session=; Path=/; HttpOnly; Max-Age=0');
 		c.header('Set-Cookie', 'csrf_token=; Path=/; Max-Age=0', { append: true });
-		return c.redirect('/login');
+		c.header('HX-Redirect', '/login');
+		return c.body(null);
 	});
 
 	return app;

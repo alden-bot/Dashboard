@@ -111,13 +111,11 @@ export function renderLayout(
 				</button>
 				<h1 class="text-base font-semibold text-white">Alden Bot</h1>
 			</div>
-			<form action="/api/logout" method="post">
-				<button type="submit" class="p-1.5 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white">
-					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-					</svg>
-				</button>
-			</form>
+			<button hx-post="/api/logout" class="p-1.5 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white">
+				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+				</svg>
+			</button>
 		</div>
 
 		<div id="sidebar-overlay" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden" onclick="toggleSidebar()"></div>
@@ -131,14 +129,12 @@ export function renderLayout(
 				${navLinks}
 			</nav>
 			<div class="p-3 border-t border-gray-800/80">
-				<form action="/api/logout" method="post">
-					<button type="submit" class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800/60 rounded-lg transition-colors">
-						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-						</svg>
-						<span class="sidebar-label">Logout</span>
-					</button>
-				</form>
+				<button hx-post="/api/logout" class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800/60 rounded-lg transition-colors">
+					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+					</svg>
+					<span class="sidebar-label">Logout</span>
+				</button>
 			</div>
 		</aside>
 
