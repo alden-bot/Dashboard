@@ -1,10 +1,7 @@
-import type { I18nManager } from '@/utils/I18nManager';
+import type { I18nManager } from '@/api';
 import { renderLayout } from './layout';
 
-export function renderFeed(
-	i18n: I18nManager,
-	lang: string,
-): string {
+export function renderFeed(i18n: I18nManager, lang: string): string {
 	const content = `
 		<div class="mb-6">
 			<h1 class="text-2xl font-bold text-white">Live Message Feed</h1>

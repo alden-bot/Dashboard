@@ -1,4 +1,4 @@
-import type { I18nManager } from '@/utils/I18nManager';
+import type { I18nManager } from '@/api';
 import type { BotStatus } from '../services/BotService';
 import { renderLayout } from './layout';
 

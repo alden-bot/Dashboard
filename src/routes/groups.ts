@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type Main from '../main';
 import { requireAuth } from '../auth/middleware';
-import { Role } from '@/core/permission/PermissionManager';
+import { Role } from '@/api';
 import { renderGroups } from '../views/groups';
 import { renderGroupDetail, renderInviteCard } from '../views/group-detail';
 
@@ -14,9 +14,7 @@ export function createGroupRoutes(plugin: Main): Hono {
 		const session = c.get('session')!;
 		const isAdmin = session.role >= Role.BotAdmin;
 
-		const groupIds = isAdmin
-			? plugin.groupTracker.getAllGroupIds()
-			: session.groupIds;
+		const groupIds = isAdmin ? plugin.groupTracker.getAllGroupIds() : session.groupIds;
 
 		const groups = await plugin.groupService.getGroupsInfo(groupIds);
 
@@ -41,7 +39,16 @@ export function createGroupRoutes(plugin: Main): Hono {
 		const members = await plugin.groupService.getGroupMembers(threadId);
 		const savedLink = plugin.groupService.getSavedLink(threadId);
 
-		return c.html(renderGroupDetail(group, members, isAdmin, plugin.i18n!, plugin.bot.config.LANGUAGE, savedLink));
+		return c.html(
+			renderGroupDetail(
+				group,
+				members,
+				isAdmin,
+				plugin.i18n!,
+				plugin.bot.config.LANGUAGE,
+				savedLink,
+			),
+		);
 	});
 
 	app.post('/groups/:id/members/:uid/kick', async (c) => {
@@ -54,9 +61,10 @@ export function createGroupRoutes(plugin: Main): Hono {
 		}
 
 		const success = await plugin.groupService.kickMember(threadId, userId);
-		return c.html(success
-			? `<div class="p-3 rounded-lg text-sm toast-success">Member kicked</div>`
-			: `<div class="p-3 rounded-lg text-sm toast-error">Failed to kick member</div>`,
+		return c.html(
+			success
+				? `<div class="p-3 rounded-lg text-sm toast-success">Member kicked</div>`
+				: `<div class="p-3 rounded-lg text-sm toast-error">Failed to kick member</div>`,
 		);
 	});
 
@@ -70,9 +78,10 @@ export function createGroupRoutes(plugin: Main): Hono {
 		}
 
 		const success = await plugin.groupService.banMember(threadId, userId);
-		return c.html(success
-			? `<div class="p-3 rounded-lg text-sm toast-success">Member banned</div>`
-			: `<div class="p-3 rounded-lg text-sm toast-error">Failed to ban member</div>`,
+		return c.html(
+			success
+				? `<div class="p-3 rounded-lg text-sm toast-success">Member banned</div>`
+				: `<div class="p-3 rounded-lg text-sm toast-error">Failed to ban member</div>`,
 		);
 	});
 
@@ -86,9 +95,10 @@ export function createGroupRoutes(plugin: Main): Hono {
 		}
 
 		const success = await plugin.groupService.unbanMember(threadId, userId);
-		return c.html(success
-			? `<div class="p-3 rounded-lg text-sm toast-success">Member unbanned</div>`
-			: `<div class="p-3 rounded-lg text-sm toast-error">Failed to unban member</div>`,
+		return c.html(
+			success
+				? `<div class="p-3 rounded-lg text-sm toast-success">Member unbanned</div>`
+				: `<div class="p-3 rounded-lg text-sm toast-error">Failed to unban member</div>`,
 		);
 	});
 
@@ -102,9 +112,10 @@ export function createGroupRoutes(plugin: Main): Hono {
 		}
 
 		const success = await plugin.botService.addVirtualDeputy(threadId, userId);
-		return c.html(success
-			? `<div class="p-3 rounded-lg text-sm toast-success">vDeputy added</div>`
-			: `<div class="p-3 rounded-lg text-sm toast-error">Failed to add vDeputy</div>`,
+		return c.html(
+			success
+				? `<div class="p-3 rounded-lg text-sm toast-success">vDeputy added</div>`
+				: `<div class="p-3 rounded-lg text-sm toast-error">Failed to add vDeputy</div>`,
 		);
 	});
 
@@ -118,9 +129,10 @@ export function createGroupRoutes(plugin: Main): Hono {
 		}
 
 		const success = await plugin.botService.removeVirtualDeputy(threadId, userId);
-		return c.html(success
-			? `<div class="p-3 rounded-lg text-sm toast-success">vDeputy removed</div>`
-			: `<div class="p-3 rounded-lg text-sm toast-error">Failed to remove vDeputy</div>`,
+		return c.html(
+			success
+				? `<div class="p-3 rounded-lg text-sm toast-success">vDeputy removed</div>`
+				: `<div class="p-3 rounded-lg text-sm toast-error">Failed to remove vDeputy</div>`,
 		);
 	});
 
@@ -135,9 +147,10 @@ export function createGroupRoutes(plugin: Main): Hono {
 		}
 
 		const success = await plugin.groupService.changeName(threadId, name);
-		return c.html(success
-			? `<div class="p-3 rounded-lg text-sm toast-success">Group name changed</div>`
-			: `<div class="p-3 rounded-lg text-sm toast-error">Failed to change group name</div>`,
+		return c.html(
+			success
+				? `<div class="p-3 rounded-lg text-sm toast-success">Group name changed</div>`
+				: `<div class="p-3 rounded-lg text-sm toast-error">Failed to change group name</div>`,
 		);
 	});
 
@@ -202,8 +215,11 @@ export function createGroupRoutes(plugin: Main): Hono {
 		`);
 	});
 
-	function canManageGroup(session: { role: number; groupIds: string[] }, threadId: string): boolean {
-		if (session.role >= (Role.BotAdmin as number)) return true;
+	function canManageGroup(
+		session: { role: Role; groupIds: string[] },
+		threadId: string,
+	): boolean {
+		if (session.role >= Role.BotAdmin) return true;
 		return session.groupIds.includes(threadId);
 	}
 

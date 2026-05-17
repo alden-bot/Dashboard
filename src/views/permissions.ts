@@ -1,4 +1,4 @@
-import type { I18nManager } from '@/utils/I18nManager';
+import type { I18nManager } from '@/api';
 import type { PermissionNode } from '../services/BotService';
 import { renderLayout } from './layout';
 import { escapeHtml } from '../utils/html';

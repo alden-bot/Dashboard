@@ -1,6 +1,5 @@
 import { randomBytes, createHash } from 'node:crypto';
-import { readJsonFileAsync, writeJsonFileAsync } from '@/utils/file';
-import { Role } from '@/core/permission/PermissionManager';
+import { readJsonFileAsync, Role, writeJsonFileAsync, type Logger } from '@/api';
 
 export interface Session {
 	token: string;
@@ -33,6 +32,7 @@ export class SessionManager {
 		private readonly dataPath: string,
 		private readonly ttlMs: number,
 		private readonly maxSessions: number,
+		private readonly logger: Logger,
 	) {
 		this.cleanupTimer = setInterval(() => this.cleanup(), 60 * 60 * 1000); // hourly
 	}
@@ -117,7 +117,7 @@ export class SessionManager {
 			return undefined;
 		}
 
-		// Extend session on use (sliding window) — persisted on next save cycle
+		// Extend session on use; persisted on next save cycle.
 		session.expiresAt = Date.now() + this.ttlMs;
 		return session;
 	}
@@ -127,7 +127,9 @@ export class SessionManager {
 	 */
 	public async revoke(token: string): Promise<void> {
 		const hash = this.hashToken(token);
-		this.sessions.delete(hash);
+		if (!this.sessions.delete(hash)) {
+			this.sessions.delete(token);
+		}
 		await this.save();
 	}
 
@@ -157,7 +159,9 @@ export class SessionManager {
 				this.sessions.delete(hash);
 			}
 		}
-		this.save().catch((err) => console.error('Session save failed during cleanup', err));
+		this.save().catch((err) =>
+			this.logger.error('Dashboard session save failed during cleanup', err),
+		);
 	}
 
 	private evictOldest(): void {

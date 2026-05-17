@@ -1,13 +1,9 @@
-import type { I18nManager } from '@/utils/I18nManager';
+import type { I18nManager } from '@/api';
 import type { PluginInfo } from '../services/BotService';
 import { renderLayout } from './layout';
 import { escapeHtml } from '../utils/html';
 
-export function renderPlugins(
-	plugins: PluginInfo[],
-	i18n: I18nManager,
-	lang: string,
-): string {
+export function renderPlugins(plugins: PluginInfo[], i18n: I18nManager, lang: string): string {
 	const rows = plugins
 		.map(
 			(p) => `

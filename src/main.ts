@@ -2,9 +2,7 @@ import path from 'node:path';
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { PluginBase } from '@/core/plugin/PluginBase';
-import { ConfigProvider } from '@/utils/ConfigProvider';
-import { I18nManager } from '@/utils/I18nManager';
+import { ConfigProvider, I18nManager, MessageEvent, PluginBase } from '@/api';
 import { DashboardCommand } from './commands/DashboardCommand';
 import { OTPManager } from './auth/OTPManager';
 import { SessionManager } from './auth/SessionManager';
@@ -18,7 +16,6 @@ import { createPluginRoutes } from './routes/plugins';
 import { createPermissionRoutes } from './routes/permissions';
 import { createConfigRoutes } from './routes/config';
 import { createStatusRoutes } from './routes/status';
-import { MessageEvent } from '@/core/event/MessageEvent';
 import { createSSERoutes } from './routes/sse';
 import { renderLogin } from './views/login';
 
@@ -76,25 +73,22 @@ export default class Main extends PluginBase {
 			path.join(this.dataFolder, 'sessions.json'),
 			this.config.get('sessionTTL'),
 			this.config.get('maxSessions'),
+			this.logger,
 		);
 		await this.sessionManager.load();
 
 		// Services
-		this.groupTracker = new GroupTracker(
-			this,
-			path.join(this.dataFolder, 'known-groups.json'),
-		);
+		this.groupTracker = new GroupTracker(this, path.join(this.dataFolder, 'known-groups.json'));
 		await this.groupTracker.load();
 		this.groupService = new GroupService(this);
 		await this.groupService.loadLinks();
 		this.botService = new BotService(this);
 
 		// Register event listeners for group tracking and feed
-		this.registerEvent(
-			MessageEvent,
-			(event) => this.onMessage(event),
-			{ priority: 99, ignoreCancelled: true },
-		);
+		this.registerEvent(MessageEvent, (event) => this.onMessage(event), {
+			priority: 99,
+			ignoreCancelled: true,
+		});
 
 		// Hono app
 		this.app = new Hono();

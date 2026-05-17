@@ -1,4 +1,4 @@
-import { CommandBase, type CommandContext } from '@/core/command/Command';
+import { CommandBase, type CommandContext } from '@/api';
 import { ThreadType } from 'zca-js';
 import type Main from '../main';
 
@@ -31,7 +31,11 @@ export class DashboardCommand extends CommandBase {
 
 		await this.bot.sendMessage(
 			{
-				msg: this.t('dashboard.otp.message', { otp, url: `http://localhost:${port}` }, lang),
+				msg: this.t(
+					'dashboard.otp.message',
+					{ otp, url: `http://localhost:${port}` },
+					lang,
+				),
 			},
 			message.threadId,
 			message.type,

@@ -1,4 +1,4 @@
-import { readJsonFileAsync, writeJsonFileAsync } from '@/utils/file';
+import { readJsonFileAsync, writeJsonFileAsync } from '@/api';
 import type Main from '../main';
 
 interface GroupEntry {
@@ -36,9 +36,12 @@ export class GroupTracker {
 		await this.refreshGroups();
 
 		// Refresh every 10 minutes
-		this.refreshTimer = setInterval(() => {
-			void this.refreshGroups();
-		}, 10 * 60 * 1000);
+		this.refreshTimer = setInterval(
+			() => {
+				void this.refreshGroups();
+			},
+			10 * 60 * 1000,
+		);
 	}
 
 	public async save(): Promise<void> {
@@ -104,10 +107,7 @@ export class GroupTracker {
 	/**
 	 * Check if a user is the leader (creator) or admin of a group.
 	 */
-	public async isUserGroupLeader(
-		userId: string,
-		threadId: string,
-	): Promise<boolean> {
+	public async isUserGroupLeader(userId: string, threadId: string): Promise<boolean> {
 		try {
 			const info = await this.plugin.bot.api.getGroupInfo(threadId);
 			const group = info.gridInfoMap[threadId];

@@ -1,4 +1,4 @@
-import type { I18nManager } from '@/utils/I18nManager';
+import type { I18nManager } from '@/api';
 
 export function renderLogin(i18n: I18nManager, lang: string): string {
 	return `<!DOCTYPE html>
@@ -44,9 +44,9 @@ export function renderLogin(i18n: I18nManager, lang: string): string {
 						type="text"
 						id="otp"
 						name="otp"
-						placeholder="123456"
-						maxlength="6"
-						pattern="[0-9]{6}"
+						placeholder="12345678"
+						maxlength="8"
+						pattern="[0-9]{8}"
 						required
 						autofocus
 						class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white text-center text-lg tracking-widest font-mono placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"

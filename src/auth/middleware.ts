@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import type { Context, Next } from 'hono';
 import type { Session } from './SessionManager';
 import type Main from '../main';
-import { Role } from '@/core/permission/PermissionManager';
+import { Role } from '@/api';
 
 declare module 'hono' {
 	interface ContextVariableMap {

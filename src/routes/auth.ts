@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type Main from '../main';
 import { renderLogin } from '../views/login';
-import { Role } from '@/core/permission/PermissionManager';
+import { Role } from '@/api';
 
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 const MAX_ATTEMPTS = 5;
@@ -36,9 +36,7 @@ export function createAuthRoutes(plugin: Main): Hono {
 		const otp = body['otp'] as string;
 
 		if (!otp) {
-			return c.html(
-				`<div class="p-3 rounded-lg text-sm toast-error">OTP is required</div>`,
-			);
+			return c.html(`<div class="p-3 rounded-lg text-sm toast-error">OTP is required</div>`);
 		}
 
 		const current = loginAttempts.get(ip);
@@ -73,9 +71,16 @@ export function createAuthRoutes(plugin: Main): Hono {
 
 		// Set session cookie with Max-Age for persistence across browser restarts
 		const maxAge = Math.floor(plugin.config.get('sessionTTL') / 1000);
-		c.header('Set-Cookie', `dashboard_session=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`);
+		c.header(
+			'Set-Cookie',
+			`dashboard_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`,
+		);
 		// Set CSRF cookie (not HttpOnly so JS can read it for HTMX headers)
-		c.header('Set-Cookie', `csrf_token=${csrfToken}; Path=/; SameSite=Strict; Max-Age=${maxAge}`, { append: true });
+		c.header(
+			'Set-Cookie',
+			`csrf_token=${csrfToken}; Path=/; SameSite=Strict; Max-Age=${maxAge}`,
+			{ append: true },
+		);
 		return c.redirect('/dashboard');
 	});
 
@@ -85,6 +90,7 @@ export function createAuthRoutes(plugin: Main): Hono {
 			await plugin.sessionManager.revoke(session.token);
 		}
 		c.header('Set-Cookie', 'dashboard_session=; Path=/; HttpOnly; Max-Age=0');
+		c.header('Set-Cookie', 'csrf_token=; Path=/; Max-Age=0', { append: true });
 		return c.redirect('/login');
 	});
 

@@ -1,13 +1,9 @@
-import type { I18nManager } from '@/utils/I18nManager';
+import type { I18nManager } from '@/api';
 import type { BotConfigData } from '../services/BotService';
 import { renderLayout } from './layout';
 import { escapeHtml } from '../utils/html';
 
-export function renderConfig(
-	config: BotConfigData,
-	i18n: I18nManager,
-	lang: string,
-): string {
+export function renderConfig(config: BotConfigData, i18n: I18nManager, lang: string): string {
 	const content = `
 		<div class="mb-6">
 			<h1 class="text-2xl font-bold text-white">Bot Config</h1>

@@ -3,7 +3,6 @@ import type Main from '../main';
 import { requireAdmin } from '../auth/middleware';
 import { renderPlugins } from '../views/plugins';
 
-
 export function createPluginRoutes(plugin: Main): Hono {
 	const app = new Hono();
 
@@ -22,7 +21,9 @@ export function createPluginRoutes(plugin: Main): Hono {
 				`<div class="p-3 rounded-lg text-sm toast-success">Reloaded ${count} plugins successfully</div>`,
 			);
 		}
-		return c.html(`<div class="p-3 rounded-lg text-sm toast-error">Failed to reload plugins</div>`);
+		return c.html(
+			`<div class="p-3 rounded-lg text-sm toast-error">Failed to reload plugins</div>`,
+		);
 	});
 
 	return app;

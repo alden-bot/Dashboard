@@ -3,7 +3,7 @@ import type Main from '../main';
 import { requireAuth } from '../auth/middleware';
 import { renderStatus } from '../views/status';
 import { renderDashboard } from '../views/dashboard';
-import { Role } from '@/core/permission/PermissionManager';
+import { Role } from '@/api';
 
 export function createStatusRoutes(plugin: Main): Hono {
 	const app = new Hono();
@@ -28,7 +28,9 @@ export function createStatusRoutes(plugin: Main): Hono {
 		const status = plugin.botService.getStatus();
 		const groupCount = plugin.groupTracker.getAllGroupIds().length;
 
-		return c.html(renderDashboard(status, groupCount, plugin.i18n!, plugin.bot.config.LANGUAGE, isAdmin));
+		return c.html(
+			renderDashboard(status, groupCount, plugin.i18n!, plugin.bot.config.LANGUAGE, isAdmin),
+		);
 	});
 
 	return app;

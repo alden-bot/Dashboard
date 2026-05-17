@@ -31,12 +31,14 @@ export function createSSERoutes(plugin: Main): Hono {
 			let connected = true;
 			const unsubscribe = plugin.subscribeFeed((entry) => {
 				if (connected) {
-					stream.writeSSE({
-						event: 'message',
-						data: JSON.stringify(entry),
-					}).catch(() => {
-						connected = false;
-					});
+					stream
+						.writeSSE({
+							event: 'message',
+							data: JSON.stringify(entry),
+						})
+						.catch(() => {
+							connected = false;
+						});
 				}
 			});
 

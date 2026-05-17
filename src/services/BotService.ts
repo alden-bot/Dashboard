@@ -1,8 +1,7 @@
 import os from 'node:os';
-import { PATH } from '@/config/constants';
+import path from 'node:path';
 import type Main from '../main';
-import { Role } from '@/core/permission/PermissionManager';
-import { formatUptime } from '@/utils/format';
+import { formatUptime, Role } from '@/api';
 
 export interface PluginInfo {
 	name: string;
@@ -87,7 +86,7 @@ export class BotService {
 		try {
 			const pm = this.plugin.bot.pluginManager;
 			await pm.unloadAll();
-			await pm.loadAll(PATH.PLUGINS_DIR);
+			await pm.loadAll(path.dirname(this.plugin.pluginPath));
 			await pm.enableAll();
 			return true;
 		} catch {
@@ -104,7 +103,8 @@ export class BotService {
 		return permissions.map((permission: string) => ({
 			node: permission,
 			level: this.plugin.bot.permissionManager.getPermissionRole(permission),
-			levelName: Role[this.plugin.bot.permissionManager.getPermissionRole(permission)] ?? 'Unknown',
+			levelName:
+				Role[this.plugin.bot.permissionManager.getPermissionRole(permission)] ?? 'Unknown',
 		}));
 	}
 

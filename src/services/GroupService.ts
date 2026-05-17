@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { readJsonFileAsync, writeJsonFileAsync } from '@/utils/file';
+import { readJsonFileAsync, writeJsonFileAsync } from '@/api';
 import type { GroupMemberProfile } from 'zca-js';
 import type Main from '../main';
 
