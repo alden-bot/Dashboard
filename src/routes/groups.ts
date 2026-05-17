@@ -36,7 +36,7 @@ export function createGroupRoutes(plugin: Main): Hono {
 			return c.text('Group not found', 404);
 		}
 
-		const members = await plugin.groupService.getGroupMembers(threadId);
+		const members = await plugin.groupService.getGroupMembers(threadId, group);
 		const savedLink = plugin.groupService.getSavedLink(threadId);
 
 		return c.html(

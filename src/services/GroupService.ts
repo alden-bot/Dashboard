@@ -7,6 +7,7 @@ export interface GroupInfo {
 	threadId: string;
 	name: string;
 	memberCount: number;
+	memberIds: string[];
 	creatorId: string;
 	adminIds: string[];
 	isTracked: boolean;
@@ -89,6 +90,7 @@ export class GroupService {
 			threadId,
 			name: group.name || 'Unknown',
 			memberCount: group.memVerList?.length || 0,
+			memberIds: group.memVerList ? group.memVerList.map((uid) => uid.split('_')[0]).filter((uid): uid is string => uid !== undefined) : [],
 			creatorId: group.creatorId || '',
 			adminIds: group.adminIds || [],
 			isTracked: true,
@@ -137,17 +139,29 @@ export class GroupService {
 	/**
 	 * Get members of a group with user info.
 	 */
-	public async getGroupMembers(threadId: string): Promise<GroupMember[]> {
+	public async getGroupMembers(threadId: string, groupInfo?: GroupInfo): Promise<GroupMember[]> {
 		try {
-			const info = await this.plugin.bot.api.getGroupInfo(threadId);
-			const group = info.gridInfoMap[threadId];
-			if (!group?.memVerList) return [];
+			let uids: string[];
+			let creatorId: string;
+			let adminIds: string[];
 
-			// memVerList return an array of uids + "_0" at the ends
-			// so we need to map its
-			const uids = group.memVerList
-				.map((uid) => uid.split('_')[0])
-				.filter((uid): uid is string => uid !== undefined);
+			if (groupInfo) {
+				uids = groupInfo.memberIds;
+				creatorId = groupInfo.creatorId;
+				adminIds = groupInfo.adminIds;
+			} else {
+				const info = await this.plugin.bot.api.getGroupInfo(threadId);
+				const group = info.gridInfoMap[threadId];
+				if (!group?.memVerList) return [];
+				
+				uids = group.memVerList
+					.map((uid) => uid.split('_')[0])
+					.filter((uid): uid is string => uid !== undefined);
+				creatorId = group.creatorId || '';
+				adminIds = group.adminIds || [];
+			}
+
+			if (uids.length === 0) return [];
 
 			const botId = await this.getBotUserId();
 
@@ -172,8 +186,8 @@ export class GroupService {
 					displayName:
 						profile?.displayName || profile?.zaloName || `User ${uid.slice(-6)}`,
 					avatar: profile?.avatar || '',
-					isCreator: group.creatorId === uid,
-					isAdmin: group.adminIds?.includes(uid) || false,
+					isCreator: creatorId === uid,
+					isAdmin: adminIds.includes(uid),
 					isDeputy: false,
 					isBot,
 				};
@@ -219,32 +233,6 @@ export class GroupService {
 			return true;
 		} catch (error) {
 			this.plugin.logger.error(`Failed to unban ${userId} from ${threadId}`, error);
-			return false;
-		}
-	}
-
-	/**
-	 * Add a deputy to a group.
-	 */
-	public async addDeputy(threadId: string, userId: string): Promise<boolean> {
-		try {
-			await this.plugin.bot.api.addGroupDeputy(userId, threadId);
-			return true;
-		} catch (error) {
-			this.plugin.logger.error(`Failed to add deputy ${userId} in ${threadId}`, error);
-			return false;
-		}
-	}
-
-	/**
-	 * Remove a deputy from a group.
-	 */
-	public async removeDeputy(threadId: string, userId: string): Promise<boolean> {
-		try {
-			await this.plugin.bot.api.removeGroupDeputy(userId, threadId);
-			return true;
-		} catch (error) {
-			this.plugin.logger.error(`Failed to remove deputy ${userId} from ${threadId}`, error);
 			return false;
 		}
 	}

@@ -15,7 +15,7 @@ Web dashboard for managing Alden Bot and groups.
 
 | Command | Aliases | Permission | Description |
 | :--- | :--- | :--- | :--- |
-| `/dashboard` | `/db`, `/web` | `dashboard.access` | Generates a secure OTP link to log into the web dashboard. |
+| `/dashboard` | `/dash` | `dashboard.access` | Generates a secure OTP link to log into the web dashboard. |
 
 ## Configuration
 

@@ -95,7 +95,7 @@ export class BotService {
 	}
 
 	/**
-	 * Get all permission permissions with their levels.
+	 * Get all permission nodes with their levels.
 	 */
 	public getPermissionNodes(): PermissionNode[] {
 		const permissions = this.plugin.bot.permissionManager.getAllPermissions();

@@ -127,11 +127,22 @@ export class GroupTracker {
 	 */
 	public async getGroupsForUser(userId: string): Promise<string[]> {
 		const managedGroups: string[] = [];
+		const threadIds = Array.from(this.groups.keys());
+		if (threadIds.length === 0) return managedGroups;
 
-		for (const threadId of this.groups.keys()) {
-			if (await this.isUserGroupLeader(userId, threadId)) {
-				managedGroups.push(threadId);
+		try {
+			const info = await this.plugin.bot.api.getGroupInfo(threadIds);
+
+			for (const threadId of threadIds) {
+				const group = info.gridInfoMap[threadId];
+				if (group) {
+					if (group.creatorId === userId || group.adminIds?.includes(userId)) {
+						managedGroups.push(threadId);
+					}
+				}
 			}
+		} catch (error) {
+			this.plugin.logger.error('GroupTracker: Failed to get group info for user', error);
 		}
 
 		return managedGroups;

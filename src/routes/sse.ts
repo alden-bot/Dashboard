@@ -59,8 +59,6 @@ export function createSSERoutes(plugin: Main): Hono {
 					}
 				}
 			}
-
-			unsubscribe();
 		});
 	});
 

@@ -102,16 +102,15 @@ export default class Main extends PluginBase {
 		const port = this.config.get('port');
 		const host = this.config.get('host');
 
-		try {
-			this.server = serve({ fetch: this.app.fetch, port, hostname: host });
-			this.logger.info(`Dashboard server started at http://${host}:${port}`);
-		} catch (error) {
+		this.server = serve({ fetch: this.app.fetch, port, hostname: host });
+		this.server.on('error', (error: any) => {
 			this.logger.error(
 				`Failed to start dashboard server on port ${port}. Is the port already in use?`,
 				error,
 			);
-			throw error;
-		}
+		});
+		
+		this.logger.info(`Dashboard server started at http://${host}:${port}`);
 	}
 
 	public async onDisable(): Promise<void> {

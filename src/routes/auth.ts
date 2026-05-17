@@ -6,9 +6,21 @@ import { Role } from '@/api';
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 const MAX_ATTEMPTS = 5;
 const WINDOW_MS = 5 * 60 * 1000;
+let cleanupInterval: NodeJS.Timeout | undefined;
 
 export function createAuthRoutes(plugin: Main): Hono {
 	const app = new Hono();
+
+	if (!cleanupInterval) {
+		cleanupInterval = setInterval(() => {
+			const now = Date.now();
+			for (const [ip, entry] of loginAttempts) {
+				if (now > entry.resetAt) {
+					loginAttempts.delete(ip);
+				}
+			}
+		}, 60_000).unref();
+	}
 
 	app.get('/login', (c) => {
 		return c.html(renderLogin(plugin.i18n!, plugin.bot.config.LANGUAGE));

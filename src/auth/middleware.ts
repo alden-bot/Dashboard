@@ -65,7 +65,7 @@ export async function csrfProtection(c: Context, next: Next): Promise<Response |
 				return c.text('CSRF token missing', 403);
 			}
 
-			if (cookieToken && cookieToken !== headerToken) {
+			if (!cookieToken || cookieToken !== headerToken) {
 				return c.text('CSRF token mismatch', 403);
 			}
 		}

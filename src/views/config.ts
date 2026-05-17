@@ -37,7 +37,7 @@ export function renderConfig(config: BotConfigData, i18n: I18nManager, lang: str
 					<div class="py-3">
 						<span class="text-gray-500 text-sm block mb-2">Admin IDs</span>
 						<div class="flex flex-wrap gap-2">
-							${config.adminIds.map((id) => `<code class="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded font-mono">${id}</code>`).join('') || '<span class="text-gray-600 text-sm">None</span>'}
+							${config.adminIds.map((id) => `<code class="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded font-mono">${escapeHtml(id)}</code>`).join('') || '<span class="text-gray-600 text-sm">None</span>'}
 						</div>
 					</div>
 				</div>
