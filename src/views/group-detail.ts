@@ -67,7 +67,7 @@ export function renderGroupDetail(
 		<div class="page-heading">
 			<a href="/groups" class="muted-link">&larr; Back to groups</a>
 			<h1>${escapeHtml(group.name)}</h1>
-			<p>${group.memberCount} members · Your access: ${escapeHtml(actorRole)}</p>
+			<p>${group.memberCount} members &middot; Your access: ${escapeHtml(actorRole)}</p>
 		</div>
 
 		<div class="grid grid-3">
