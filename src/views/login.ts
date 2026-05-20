@@ -1,43 +1,30 @@
 import type { I18nManager } from '@/api';
+import { escapeAttr } from '../utils/html';
 
 export function renderLogin(i18n: I18nManager, lang: string): string {
 	return `<!DOCTYPE html>
-<html lang="${lang}" class="h-full">
+<html lang="${escapeAttr(lang)}" class="h-full">
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Login - Alden Bot Dashboard</title>
-	<script src="https://cdn.tailwindcss.com"></script>
-	<script>
-		tailwind.config = {
-			theme: {
-				extend: {
-					colors: {
-						dark: {
-							700: '#1f2937',
-							800: '#111827',
-							900: '#030712',
-						}
-					}
-				}
-			}
-		}
-	</script>
+	<title>Login - alden-bot Dashboard</title>
+	<link rel="stylesheet" href="/assets/dashboard.css">
+	<script defer src="/assets/dashboard.js"></script>
 </head>
-<body class="h-full bg-gray-950 flex items-center justify-center p-4">
-	<div class="w-full max-w-sm">
-		<div class="bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-2xl">
+<body class="center-page">
+	<div class="login-shell">
+		<div class="login-card">
 			<div class="text-center mb-8">
 				<div class="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-2xl mb-4">
 					<svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
 					</svg>
 				</div>
-				<h1 class="text-2xl font-bold text-white">Alden Bot</h1>
+				<h1 class="text-2xl font-bold text-white">alden-bot</h1>
 				<p class="text-gray-500 text-sm mt-1">Dashboard Login</p>
 			</div>
 
-			<form action="/api/login" method="post" class="space-y-4">
+			<form action="/api/login" method="post" hx-post="/api/login" hx-target="#login-result" hx-swap="innerHTML" class="space-y-4">
 				<div>
 					<label for="otp" class="block text-sm font-medium text-gray-400 mb-2">OTP Code</label>
 					<input

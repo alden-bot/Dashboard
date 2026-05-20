@@ -1,7 +1,7 @@
 import type { I18nManager } from '@/api';
 import type { GroupInfo } from '../services/GroupService';
 import { renderLayout } from './layout';
-import { escapeHtml } from '../utils/html';
+import { escapeAttr, escapeHtml } from '../utils/html';
 
 export function renderGroups(
 	groups: GroupInfo[],
@@ -14,12 +14,12 @@ export function renderGroups(
 			(g) => `
 		<tr class="border-b border-gray-800 hover:bg-gray-900/50 transition-colors">
 			<td class="px-4 py-3">
-				<a href="/groups/${g.threadId}" class="text-indigo-400 hover:text-indigo-300 font-medium">${escapeHtml(g.name)}</a>
+				<a href="/groups/${escapeAttr(g.threadId)}" class="text-indigo-400 hover:text-indigo-300 font-medium">${escapeHtml(g.name)}</a>
 			</td>
 			<td class="px-4 py-3 text-gray-400">${g.memberCount}</td>
-			<td class="px-4 py-3 text-gray-500 font-mono text-xs">${g.threadId}</td>
+			<td class="px-4 py-3 text-gray-500 font-mono text-xs">${escapeHtml(g.threadId)}</td>
 			<td class="px-4 py-3">
-				<a href="/groups/${g.threadId}" class="text-sm text-gray-400 hover:text-white transition-colors">View &rarr;</a>
+				<a href="/groups/${escapeAttr(g.threadId)}" class="text-sm text-gray-400 hover:text-white transition-colors">View &rarr;</a>
 			</td>
 		</tr>`,
 		)

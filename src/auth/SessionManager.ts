@@ -1,4 +1,4 @@
-import { randomBytes, createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { readJsonFileAsync, Role, writeJsonFileAsync, type Logger } from '@/api';
 
 export interface Session {
@@ -43,17 +43,18 @@ export class SessionManager {
 
 		const now = Date.now();
 		for (const [hash, stored] of Object.entries(data.sessions)) {
-			if (stored.expiresAt > now) {
-				this.sessions.set(hash, {
-					token: hash,
-					userId: stored.userId,
-					role: stored.role,
-					groupIds: stored.groupIds,
-					createdAt: stored.createdAt,
-					expiresAt: stored.expiresAt,
-					csrfToken: stored.csrfToken,
-				});
-			}
+			if (!isStoredSession(stored)) continue;
+			if (stored.expiresAt <= now) continue;
+
+			this.sessions.set(hash, {
+				token: hash,
+				userId: stored.userId,
+				role: stored.role,
+				groupIds: stored.groupIds,
+				createdAt: stored.createdAt,
+				expiresAt: stored.expiresAt,
+				csrfToken: stored.csrfToken,
+			});
 		}
 	}
 
@@ -183,4 +184,18 @@ export class SessionManager {
 	private hashToken(token: string): string {
 		return createHash('sha256').update(token).digest('hex');
 	}
+}
+
+function isStoredSession(value: unknown): value is StoredSession {
+	if (!value || typeof value !== 'object') return false;
+	const candidate = value as Partial<StoredSession>;
+	return (
+		typeof candidate.userId === 'string' &&
+		typeof candidate.role === 'number' &&
+		Array.isArray(candidate.groupIds) &&
+		candidate.groupIds.every((groupId) => typeof groupId === 'string') &&
+		typeof candidate.createdAt === 'number' &&
+		typeof candidate.expiresAt === 'number' &&
+		typeof candidate.csrfToken === 'string'
+	);
 }

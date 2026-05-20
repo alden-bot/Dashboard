@@ -1,6 +1,7 @@
 import type { I18nManager } from '@/api';
 import type { BotStatus } from '../services/BotService';
 import { renderLayout } from './layout';
+import { escapeHtml } from '../utils/html';
 
 export function renderDashboard(
 	status: BotStatus,
@@ -16,30 +17,33 @@ export function renderDashboard(
 	const stats = [
 		{
 			label: 'Version',
-			value: `v${status.version}`,
+			value: `v${escapeHtml(status.version)}`,
 			icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
 		},
 		{
 			label: 'Uptime',
-			value: status.uptimeFormatted,
+			value: escapeHtml(status.uptimeFormatted),
 			icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
-		},
-		{
-			label: 'Memory',
-			value: `${status.memory.heapUsed} MB`,
-			icon: 'M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z',
 		},
 		{
 			label: 'Groups',
 			value: String(groupCount),
 			icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z',
 		},
-		{
+	];
+
+	if (isAdmin) {
+		stats.splice(2, 0, {
+			label: 'Memory',
+			value: `${escapeHtml(status.memory.heapUsed)} MB`,
+			icon: 'M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z',
+		});
+		stats.push({
 			label: 'Plugins',
 			value: String(status.pluginCount),
 			icon: 'M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z',
-		},
-	];
+		});
+	}
 
 	const statCards = stats
 		.map(
@@ -53,7 +57,7 @@ export function renderDashboard(
 				</div>
 			</div>
 			<div class="text-2xl font-bold text-white">${s.value}</div>
-			<div class="text-sm text-gray-500 mt-1">${s.label}</div>
+			<div class="text-sm text-gray-500 mt-1">${escapeHtml(s.label)}</div>
 		</div>`,
 		)
 		.join('');
@@ -128,21 +132,23 @@ export function renderDashboard(
 			${statCards}
 		</div>
 
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+		${
+			isAdmin
+				? `<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
 			<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-lg">
 				<h3 class="text-sm font-medium text-gray-400 mb-4">System</h3>
 				<div class="space-y-2 text-sm">
 					<div class="flex justify-between py-1.5 border-b border-gray-800/60">
 						<span class="text-gray-500">OS</span>
-						<span class="text-gray-300">${status.os.type} ${status.os.arch}</span>
+						<span class="text-gray-300">${escapeHtml(status.os.type)} ${escapeHtml(status.os.arch)}</span>
 					</div>
 					<div class="flex justify-between py-1.5 border-b border-gray-800/60">
 						<span class="text-gray-500">Node.js</span>
-						<span class="text-gray-300">${status.node}</span>
+						<span class="text-gray-300">${escapeHtml(status.node)}</span>
 					</div>
 					<div class="flex justify-between py-1.5">
 						<span class="text-gray-500">CPU</span>
-						<span class="text-gray-300 truncate ml-4">${status.cpu}</span>
+						<span class="text-gray-300 truncate ml-4">${escapeHtml(status.cpu)}</span>
 					</div>
 				</div>
 			</div>
@@ -172,7 +178,9 @@ export function renderDashboard(
 					</div>
 				</div>
 			</div>
-		</div>
+		</div>`
+				: ''
+		}
 
 		<div class="mb-4">
 			<h3 class="text-sm font-medium text-gray-400 mb-4">Quick Actions</h3>

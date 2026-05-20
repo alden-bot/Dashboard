@@ -1,9 +1,27 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import type Main from '../main';
 import { requireAuth } from '../auth/middleware';
 import { Role } from '@/api';
 import { renderGroups } from '../views/groups';
 import { renderGroupDetail, renderInviteCard } from '../views/group-detail';
+import type { GroupMember } from '../services/GroupService';
+import {
+	canAccessGroup,
+	canGrantVirtualDeputy,
+	canManageGroupSettings,
+	canManageVirtualDeputies,
+	canModerateMember,
+	canRevokeVirtualDeputy,
+	isBotAdminSession,
+} from '../auth/access';
+import { escapeHtml, formatList, toast } from '../utils/html';
+
+interface GroupAccess {
+	sessionUserId: string;
+	isBotAdmin: boolean;
+	actorRole: Role;
+}
 
 export function createGroupRoutes(plugin: Main): Hono {
 	const app = new Hono();
@@ -12,29 +30,20 @@ export function createGroupRoutes(plugin: Main): Hono {
 
 	app.get('/groups', async (c) => {
 		const session = c.get('session')!;
-		const isAdmin = session.role >= Role.BotAdmin;
-
-		const groupIds = isAdmin ? plugin.groupTracker.getAllGroupIds() : session.groupIds;
-
+		const isBotAdmin = isBotAdminSession(session);
+		const groupIds = isBotAdmin ? plugin.groupTracker.getAllGroupIds() : session.groupIds;
 		const groups = await plugin.groupService.getGroupsInfo(groupIds);
 
-		return c.html(renderGroups(groups, isAdmin, plugin.i18n!, plugin.bot.config.LANGUAGE));
+		return c.html(renderGroups(groups, isBotAdmin, plugin.i18n!, plugin.bot.config.LANGUAGE));
 	});
 
 	app.get('/groups/:id', async (c) => {
 		const threadId = c.req.param('id');
-		const session = c.get('session')!;
-		const isAdmin = session.role >= Role.BotAdmin;
-
-		// Check access
-		if (!isAdmin && !session.groupIds.includes(threadId)) {
-			return c.text('Forbidden', 403);
-		}
+		const access = await getGroupAccess(c, plugin, threadId);
+		if (!access) return c.text('Forbidden', 403);
 
 		const group = await plugin.groupService.getGroupInfo(threadId);
-		if (!group) {
-			return c.text('Group not found', 404);
-		}
+		if (!group) return c.text('Group not found', 404);
 
 		const members = await plugin.groupService.getGroupMembers(threadId, group);
 		const savedLink = plugin.groupService.getSavedLink(threadId);
@@ -43,7 +52,15 @@ export function createGroupRoutes(plugin: Main): Hono {
 			renderGroupDetail(
 				group,
 				members,
-				isAdmin,
+				{
+					isBotAdmin: access.isBotAdmin,
+					actorRole: access.actorRole,
+					canManageSettings: canManageGroupSettings(access.actorRole, access.isBotAdmin),
+					canManageVirtualDeputies: canManageVirtualDeputies(
+						access.actorRole,
+						access.isBotAdmin,
+					),
+				},
 				plugin.i18n!,
 				plugin.bot.config.LANGUAGE,
 				savedLink,
@@ -52,176 +69,227 @@ export function createGroupRoutes(plugin: Main): Hono {
 	});
 
 	app.post('/groups/:id/members/:uid/kick', async (c) => {
-		const session = c.get('session')!;
-		const threadId = c.req.param('id');
-		const userId = c.req.param('uid');
-
-		if (!canManageGroup(session, threadId)) {
-			return c.text('Forbidden', 403);
-		}
-
-		const success = await plugin.groupService.kickMember(threadId, userId);
-		return c.html(
-			success
-				? `<div class="p-3 rounded-lg text-sm toast-success">Member kicked</div>`
-				: `<div class="p-3 rounded-lg text-sm toast-error">Failed to kick member</div>`,
-		);
+		return handleMemberAction(c, plugin, 'kick');
 	});
 
 	app.post('/groups/:id/members/:uid/ban', async (c) => {
-		const session = c.get('session')!;
-		const threadId = c.req.param('id');
-		const userId = c.req.param('uid');
-
-		if (!canManageGroup(session, threadId)) {
-			return c.text('Forbidden', 403);
-		}
-
-		const success = await plugin.groupService.banMember(threadId, userId);
-		return c.html(
-			success
-				? `<div class="p-3 rounded-lg text-sm toast-success">Member banned</div>`
-				: `<div class="p-3 rounded-lg text-sm toast-error">Failed to ban member</div>`,
-		);
+		return handleMemberAction(c, plugin, 'ban');
 	});
 
 	app.post('/groups/:id/members/:uid/unban', async (c) => {
-		const session = c.get('session')!;
-		const threadId = c.req.param('id');
-		const userId = c.req.param('uid');
-
-		if (!canManageGroup(session, threadId)) {
-			return c.text('Forbidden', 403);
-		}
-
-		const success = await plugin.groupService.unbanMember(threadId, userId);
-		return c.html(
-			success
-				? `<div class="p-3 rounded-lg text-sm toast-success">Member unbanned</div>`
-				: `<div class="p-3 rounded-lg text-sm toast-error">Failed to unban member</div>`,
-		);
+		return handleMemberAction(c, plugin, 'unban');
 	});
 
 	app.post('/groups/:id/deputies/:uid/add', async (c) => {
-		const session = c.get('session')!;
-		const threadId = c.req.param('id');
-		const userId = c.req.param('uid');
+		const result = await getTargetAccess(c, plugin);
+		if (result instanceof Response) return result;
 
-		if (!canManageGroup(session, threadId)) {
-			return c.text('Forbidden', 403);
+		if (
+			!canGrantVirtualDeputy(result.access.actorRole, result.access.isBotAdmin, result.target)
+		) {
+			return c.html(
+				toast('error', 'Only BotAdmin or group owner can grant vDeputy to members.'),
+				403,
+			);
 		}
 
-		const success = await plugin.botService.addVirtualDeputy(threadId, userId);
+		const success = await plugin.botService.addVirtualDeputy(result.threadId, result.userId);
 		return c.html(
-			success
-				? `<div class="p-3 rounded-lg text-sm toast-success">vDeputy added</div>`
-				: `<div class="p-3 rounded-lg text-sm toast-error">Failed to add vDeputy</div>`,
+			success ? toast('success', 'vDeputy added') : toast('error', 'Failed to add vDeputy'),
 		);
 	});
 
 	app.post('/groups/:id/deputies/:uid/remove', async (c) => {
-		const session = c.get('session')!;
-		const threadId = c.req.param('id');
-		const userId = c.req.param('uid');
+		const result = await getTargetAccess(c, plugin);
+		if (result instanceof Response) return result;
 
-		if (!canManageGroup(session, threadId)) {
-			return c.text('Forbidden', 403);
+		if (
+			!canRevokeVirtualDeputy(
+				result.access.actorRole,
+				result.access.isBotAdmin,
+				result.target,
+			)
+		) {
+			return c.html(
+				toast('error', 'Only BotAdmin or group owner can revoke vDeputy access.'),
+				403,
+			);
 		}
 
-		const success = await plugin.botService.removeVirtualDeputy(threadId, userId);
+		const success = await plugin.botService.removeVirtualDeputy(result.threadId, result.userId);
 		return c.html(
 			success
-				? `<div class="p-3 rounded-lg text-sm toast-success">vDeputy removed</div>`
-				: `<div class="p-3 rounded-lg text-sm toast-error">Failed to remove vDeputy</div>`,
+				? toast('success', 'vDeputy removed')
+				: toast('error', 'Failed to remove vDeputy'),
 		);
 	});
 
 	app.post('/groups/:id/name', async (c) => {
-		const session = c.get('session')!;
 		const threadId = c.req.param('id');
-		const body = await c.req.parseBody();
-		const name = body['name'] as string;
-
-		if (!canManageGroup(session, threadId)) {
-			return c.text('Forbidden', 403);
+		const access = await getGroupAccess(c, plugin, threadId);
+		if (!access) return c.text('Forbidden', 403);
+		if (!canManageGroupSettings(access.actorRole, access.isBotAdmin)) {
+			return c.html(toast('error', 'You cannot change this group.'), 403);
 		}
+
+		const body = await c.req.parseBody();
+		const name = String(body['name'] ?? '').trim();
+		if (!name) return c.html(toast('error', 'Group name is required'), 400);
 
 		const success = await plugin.groupService.changeName(threadId, name);
 		return c.html(
 			success
-				? `<div class="p-3 rounded-lg text-sm toast-success">Group name changed</div>`
-				: `<div class="p-3 rounded-lg text-sm toast-error">Failed to change group name</div>`,
+				? toast('success', 'Group name changed')
+				: toast('error', 'Failed to change group name'),
 		);
 	});
 
 	app.post('/groups/:id/link/enable', async (c) => {
-		const session = c.get('session')!;
-		const threadId = c.req.param('id');
-
-		if (!canManageGroup(session, threadId)) {
-			return c.text('Forbidden', 403);
-		}
-
-		const link = await plugin.groupService.enableLink(threadId);
-		const savedLink = link || plugin.groupService.getSavedLink(threadId);
-		return c.html(renderInviteCard(threadId, savedLink));
+		return handleInviteLink(c, plugin, 'enable');
 	});
 
 	app.post('/groups/:id/link/refresh', async (c) => {
-		const session = c.get('session')!;
-		const threadId = c.req.param('id');
-
-		if (!canManageGroup(session, threadId)) {
-			return c.text('Forbidden', 403);
-		}
-
-		const link = await plugin.groupService.enableLink(threadId);
-		const savedLink = link || plugin.groupService.getSavedLink(threadId);
-		return c.html(renderInviteCard(threadId, savedLink));
+		return handleInviteLink(c, plugin, 'refresh');
 	});
 
 	app.post('/groups/:id/link/disable', async (c) => {
-		const session = c.get('session')!;
-		const threadId = c.req.param('id');
-
-		if (!canManageGroup(session, threadId)) {
-			return c.text('Forbidden', 403);
-		}
-
-		await plugin.groupService.disableLink(threadId);
-		return c.html(renderInviteCard(threadId));
+		return handleInviteLink(c, plugin, 'disable');
 	});
 
 	app.get('/groups/:id/members/:uid/detail', async (c) => {
-		const session = c.get('session')!;
-		const threadId = c.req.param('id');
-		const userId = c.req.param('uid');
+		const result = await getTargetAccess(c, plugin);
+		if (result instanceof Response) return result;
 
-		if (!canManageGroup(session, threadId)) {
-			return c.text('Forbidden', 403);
-		}
-
-		const role = await plugin.bot.permissionManager.getRoleLevel(threadId, userId, true);
-		const roleName = Role[role] ?? 'Member';
-		const perms = plugin.bot.permissionManager.getUserPermissions(userId);
-		const isVirtualDeputy = plugin.bot.permissionManager.isVirtualDeputy(threadId, userId);
+		const perms = plugin.bot.permissionManager.getUserPermissions(result.userId);
+		const roleName = getDisplayRole(result.target);
 
 		return c.html(`
-			<div class="mt-2 p-3 bg-gray-800/50 rounded-lg border border-gray-700 text-sm space-y-1">
-				<div class="flex justify-between"><span class="text-gray-400">Role:</span><span class="text-white">${roleName}</span></div>
-				<div class="flex justify-between"><span class="text-gray-400">Virtual Deputy:</span><span class="text-white">${isVirtualDeputy ? 'Yes' : 'No'}</span></div>
-				<div class="flex justify-between"><span class="text-gray-400">Permissions:</span><span class="text-white">${perms.length > 0 ? perms.join(', ') : 'None'}</span></div>
+			<div class="member-detail">
+				<div><span>Role:</span><strong>${escapeHtml(roleName)}</strong></div>
+				<div><span>Virtual Deputy:</span><strong>${result.target.isVirtualDeputy ? 'Yes' : 'No'}</strong></div>
+				<div><span>Permissions:</span><strong>${formatList(perms)}</strong></div>
 			</div>
 		`);
 	});
 
-	function canManageGroup(
-		session: { role: Role; groupIds: string[] },
-		threadId: string,
-	): boolean {
-		if (session.role >= Role.BotAdmin) return true;
-		return session.groupIds.includes(threadId);
+	return app;
+}
+
+async function handleMemberAction(
+	c: Context,
+	plugin: Main,
+	action: 'kick' | 'ban' | 'unban',
+): Promise<Response> {
+	const result = await getTargetAccess(c, plugin);
+	if (result instanceof Response) return result;
+
+	if (!canModerateMember(result.access.actorRole, result.access.isBotAdmin, result.target)) {
+		return c.html(toast('error', 'This action is only allowed against normal members.'), 403);
 	}
 
-	return app;
+	const success =
+		action === 'kick'
+			? await plugin.groupService.kickMember(result.threadId, result.userId)
+			: action === 'ban'
+				? await plugin.groupService.banMember(result.threadId, result.userId)
+				: await plugin.groupService.unbanMember(result.threadId, result.userId);
+
+	return c.html(
+		success
+			? toast('success', getActionSuccessMessage(action))
+			: toast('error', getActionFailureMessage(action)),
+	);
+}
+
+async function handleInviteLink(
+	c: Context,
+	plugin: Main,
+	action: 'enable' | 'refresh' | 'disable',
+): Promise<Response> {
+	const threadId = c.req.param('id');
+	const access = await getGroupAccess(c, plugin, threadId);
+	if (!access) return c.text('Forbidden', 403);
+	if (!canManageGroupSettings(access.actorRole, access.isBotAdmin)) {
+		return c.html(
+			renderInviteCard(threadId, plugin.groupService.getSavedLink(threadId), false),
+		);
+	}
+
+	if (action === 'disable') {
+		await plugin.groupService.disableLink(threadId);
+		return c.html(renderInviteCard(threadId, undefined, true));
+	}
+
+	const link = await plugin.groupService.enableLink(threadId);
+	const savedLink = link || plugin.groupService.getSavedLink(threadId);
+	return c.html(renderInviteCard(threadId, savedLink, true));
+}
+
+async function getTargetAccess(
+	c: Context,
+	plugin: Main,
+): Promise<
+	| Response
+	| {
+			access: GroupAccess;
+			threadId: string;
+			userId: string;
+			target: GroupMember;
+	  }
+> {
+	const threadId = c.req.param('id');
+	const userId = c.req.param('uid');
+	const access = await getGroupAccess(c, plugin, threadId);
+	if (!access) return c.text('Forbidden', 403);
+
+	const target = await plugin.groupService.getGroupMember(threadId, userId);
+	if (!target) return c.html(toast('error', 'Member not found'), 404);
+
+	return { access, threadId, userId, target };
+}
+
+async function getGroupAccess(
+	c: Context,
+	plugin: Main,
+	threadId: string,
+): Promise<GroupAccess | null> {
+	const session = c.get('session');
+	if (!session || !canAccessGroup(session, threadId)) return null;
+
+	const isBotAdmin = isBotAdminSession(session);
+	const actorRole = isBotAdmin
+		? Role.BotAdmin
+		: await plugin.groupTracker.getRoleForUser(session.userId, threadId);
+
+	if (!isBotAdmin && actorRole < Role.Deputy) return null;
+	return { sessionUserId: session.userId, isBotAdmin, actorRole };
+}
+
+function getDisplayRole(member: GroupMember): string {
+	switch (member.role) {
+		case 'botAdmin':
+			return 'BotAdmin';
+		case 'leader':
+			return 'Leader';
+		case 'deputy':
+			return 'Deputy';
+		case 'virtualDeputy':
+			return 'vDeputy';
+		case 'bot':
+			return 'Bot';
+		case 'member':
+			return 'Member';
+	}
+}
+
+function getActionSuccessMessage(action: 'kick' | 'ban' | 'unban'): string {
+	if (action === 'kick') return 'Member kicked';
+	if (action === 'ban') return 'Member banned';
+	return 'Member unbanned';
+}
+
+function getActionFailureMessage(action: 'kick' | 'ban' | 'unban'): string {
+	if (action === 'kick') return 'Failed to kick member';
+	if (action === 'ban') return 'Failed to ban member';
+	return 'Failed to unban member';
 }

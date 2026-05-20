@@ -42,22 +42,24 @@ export function createSSERoutes(plugin: Main): Hono {
 				}
 			});
 
-			// Cleanup on disconnect
 			stream.onAbort(() => {
 				connected = false;
 				unsubscribe();
 			});
 
-			// Keep stream alive with periodic pings
-			while (connected) {
-				await new Promise((resolve) => setTimeout(resolve, 15000));
-				if (connected) {
-					try {
-						await stream.writeSSE({ event: 'ping', data: '{}' });
-					} catch {
-						connected = false;
+			try {
+				while (connected) {
+					await new Promise((resolve) => setTimeout(resolve, 15000));
+					if (connected) {
+						try {
+							await stream.writeSSE({ event: 'ping', data: '{}' });
+						} catch {
+							connected = false;
+						}
 					}
 				}
+			} finally {
+				unsubscribe();
 			}
 		});
 	});

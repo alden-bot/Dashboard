@@ -1,8 +1,8 @@
-import { randomBytes } from 'node:crypto';
 import type { Context, Next } from 'hono';
 import type { Session } from './SessionManager';
 import type Main from '../main';
 import { Role } from '@/api';
+import { getCookie, setCookie } from './cookies';
 
 declare module 'hono' {
 	interface ContextVariableMap {
@@ -11,10 +11,6 @@ declare module 'hono' {
 	}
 }
 
-/**
- * Auth middleware: validates session cookie and attaches session to context.
- * Sets CSRF cookie if missing (handles legacy sessions without csrfToken).
- */
 export function createAuthMiddleware(plugin: Main) {
 	return async (c: Context, next: Next): Promise<void> => {
 		const token = getCookie(c, 'dashboard_session');
@@ -24,21 +20,8 @@ export function createAuthMiddleware(plugin: Main) {
 			c.set('session', session);
 
 			if (session) {
-				// Generate CSRF token if session doesn't have one (legacy sessions)
-				if (!session.csrfToken) {
-					session.csrfToken = randomBytes(32).toString('hex');
-				}
 				c.set('csrfToken', session.csrfToken);
-
-				// Always set CSRF cookie if missing from browser
-				const existingCsrf = getCookie(c, 'csrf_token');
-				if (!existingCsrf) {
-					const maxAge = Math.floor(plugin.config.get('sessionTTL') / 1000);
-					c.header(
-						'Set-Cookie',
-						`csrf_token=${session.csrfToken}; Path=/; SameSite=Strict; Max-Age=${maxAge}`,
-					);
-				}
+				setCsrfCookie(c, plugin, session.csrfToken);
 			}
 		} else {
 			c.set('session', undefined);
@@ -48,24 +31,18 @@ export function createAuthMiddleware(plugin: Main) {
 	};
 }
 
-/**
- * CSRF protection middleware for POST requests.
- * Validates the `X-CSRF-Token` header against the `csrf_token` cookie.
- * Only applies when both cookie and header are present (graceful for legacy sessions).
- */
 export async function csrfProtection(c: Context, next: Next): Promise<Response | void> {
 	const method = c.req.method;
 	if (method === 'POST' || method === 'PUT' || method === 'DELETE') {
 		const session = c.get('session');
 		if (session) {
-			const cookieToken = getCookie(c, 'csrf_token');
 			const headerToken = c.req.header('X-CSRF-Token');
 
 			if (!headerToken) {
 				return c.text('CSRF token missing', 403);
 			}
 
-			if (!cookieToken || cookieToken !== headerToken) {
+			if (session.csrfToken !== headerToken) {
 				return c.text('CSRF token mismatch', 403);
 			}
 		}
@@ -73,9 +50,6 @@ export async function csrfProtection(c: Context, next: Next): Promise<Response |
 	await next();
 }
 
-/**
- * Require authentication. Redirects to /login if not authenticated.
- */
 export async function requireAuth(c: Context, next: Next): Promise<Response | void> {
 	const session = c.get('session');
 	if (!session) {
@@ -84,9 +58,6 @@ export async function requireAuth(c: Context, next: Next): Promise<Response | vo
 	await next();
 }
 
-/**
- * Require BotAdmin role.
- */
 export async function requireAdmin(c: Context, next: Next): Promise<Response | void> {
 	const session = c.get('session');
 	if (!session) {
@@ -98,6 +69,21 @@ export async function requireAdmin(c: Context, next: Next): Promise<Response | v
 	await next();
 }
 
+function setCsrfCookie(c: Context, plugin: Main, token: string): void {
+	const maxAge = Math.floor(plugin.config.get('sessionTTL') / 1000);
+	setCookie(c, 'csrf_token', token, {
+		maxAge,
+		secure: shouldUseSecureCookie(c, plugin),
+		sameSite: 'Strict',
+	});
+}
+
+export function shouldUseSecureCookie(c: Context, plugin: Main): boolean {
+	if (plugin.config.get('secureCookies')) return true;
+	if (!plugin.config.get('trustProxy')) return false;
+	return c.req.header('x-forwarded-proto') === 'https';
+}
+
 function renderForbidden(): string {
 	return `<!DOCTYPE html>
 <html class="h-full">
@@ -105,31 +91,16 @@ function renderForbidden(): string {
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>403 - Forbidden</title>
-	<script src="https://cdn.tailwindcss.com"></script>
+	<link rel="stylesheet" href="/assets/dashboard.css">
 </head>
-<body class="h-full bg-gray-950 flex items-center justify-center">
-	<div class="text-center">
-		<h1 class="text-6xl font-bold text-gray-600">403</h1>
-		<p class="text-gray-400 mt-4">You don't have permission to access this page.</p>
-		<a href="/dashboard" class="inline-block mt-6 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">
+<body class="center-page">
+	<div class="login-card text-center">
+		<h1>403</h1>
+		<p>You don't have permission to access this page.</p>
+		<a href="/dashboard" class="btn btn-primary">
 			Back to Dashboard
 		</a>
 	</div>
 </body>
 </html>`;
-}
-
-/**
- * Get cookie value by name.
- */
-function getCookie(c: Context, name: string): string | undefined {
-	const cookies = c.req.header('cookie');
-	if (!cookies) return undefined;
-
-	for (const cookie of cookies.split(';')) {
-		const [key, value] = cookie.trim().split('=');
-		if (key === name) return value;
-	}
-
-	return undefined;
 }

@@ -1,7 +1,19 @@
+import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type Main from '../main';
 import { formatUptime, Role } from '@/api';
+import { PATH } from '@/config/constants';
+import {
+	AWAKE_EXIT_CODE,
+	createLauncherRequest,
+	isDockerRuntime,
+	isLauncherManaged,
+	requestLauncherRestart,
+	sendLauncherRequest,
+	writeLauncherRequest,
+} from '@/core/update/RestartProtocol';
+import { formatReleaseDate, UpdateService } from '@/core/update/UpdateService';
 
 export interface PluginInfo {
 	name: string;
@@ -52,9 +64,14 @@ export interface BotConfigData {
 	version: string;
 }
 
+export interface OperationResult {
+	ok: boolean;
+	message: string;
+}
+
 /**
  * Service for bot management operations.
- * Bridges AldenBot managers to dashboard data.
+ * Bridges alden-bot managers to dashboard data.
  */
 export class BotService {
 	constructor(private readonly plugin: Main) {}
@@ -89,7 +106,8 @@ export class BotService {
 			await pm.loadAll(path.dirname(this.plugin.pluginPath));
 			await pm.enableAll();
 			return true;
-		} catch {
+		} catch (error) {
+			this.plugin.logger.error('Dashboard failed to reload plugins', error);
 			return false;
 		}
 	}
@@ -185,4 +203,135 @@ export class BotService {
 			version: this.plugin.bot.config.version,
 		};
 	}
+
+	public async checkUpdate(): Promise<OperationResult> {
+		const result = await new UpdateService({ packageJsonPath: PATH.PACKAGE_JSON }).check(
+			this.plugin.bot.config.version,
+		);
+
+		switch (result.status) {
+			case 'available':
+				return {
+					ok: true,
+					message: `Update available: v${result.currentVersion} -> v${result.latestVersion ?? 'unknown'} (${formatReleaseDate(result.release?.publishedAt)}).`,
+				};
+			case 'up-to-date':
+				return {
+					ok: true,
+					message: `alden-bot is up to date at v${result.currentVersion}.`,
+				};
+			case 'ahead':
+				return {
+					ok: true,
+					message: `Current version v${result.currentVersion} is ahead of latest release v${result.latestVersion ?? 'unknown'}.`,
+				};
+			case 'unavailable':
+				return {
+					ok: false,
+					message: `Update check unavailable: ${result.error ?? 'unknown error'}.`,
+				};
+		}
+	}
+
+	public async applyUpdate(): Promise<OperationResult> {
+		if (isDockerRuntime()) {
+			return {
+				ok: false,
+				message:
+					'Docker runtime detected. Pull/rebuild the image and restart the container instead of applying in-place updates.',
+			};
+		}
+
+		if (!isLauncherManaged()) {
+			return {
+				ok: false,
+				message:
+					'Update apply requires launcher-managed startup. Start alden-bot with pnpm start.',
+			};
+		}
+
+		const preparation = await new UpdateService({
+			packageJsonPath: PATH.PACKAGE_JSON,
+		}).prepareApply(this.plugin.bot.config.version);
+
+		if (preparation.check.status !== 'available' || !preparation.check.release) {
+			return this.checkUpdate();
+		}
+
+		if (!preparation.assets) {
+			return {
+				ok: false,
+				message: `Release v${preparation.check.latestVersion ?? 'unknown'} is missing the required zip and SHA256 assets.`,
+			};
+		}
+
+		const request = createLauncherRequest('update', {
+			reason: 'dashboard update apply',
+			release: {
+				version: preparation.check.release.version,
+				tagName: preparation.check.release.tagName,
+				releaseUrl: preparation.check.release.releaseUrl,
+				assetName: preparation.assets.assetName,
+				assetUrl: preparation.assets.assetUrl,
+				checksumAssetName: preparation.assets.checksumAssetName,
+				checksumUrl: preparation.assets.checksumUrl,
+			},
+		});
+
+		await writeLauncherRequest(request);
+		sendLauncherRequest(request);
+		this.requestGracefulRestart('dashboard update apply');
+
+		return {
+			ok: true,
+			message: `Update to v${preparation.check.release.version} queued. alden-bot is restarting through AWAKE.`,
+		};
+	}
+
+	public async restart(): Promise<OperationResult> {
+		if (isLauncherManaged()) {
+			await requestLauncherRestart('dashboard restart');
+			this.requestGracefulRestart('dashboard restart');
+			return {
+				ok: true,
+				message: 'Restart requested through AWAKE launcher.',
+			};
+		}
+
+		setTimeout(() => {
+			process.emit('SIGTERM');
+		}, 1000);
+
+		return {
+			ok: true,
+			message:
+				'Restart requested. Direct runs need an external supervisor if the process should start again automatically.',
+		};
+	}
+
+	public async getRecentLogs(lines: number): Promise<string[]> {
+		const filePath = path.join(PATH.LOGS_DIR, `bot-${getDateString()}.log`);
+		try {
+			const content = await fsp.readFile(filePath, 'utf-8');
+			return content.trimEnd().split(/\r?\n/).slice(-Math.max(1, lines));
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+			this.plugin.logger.error('Dashboard failed to read logs', error);
+			return [];
+		}
+	}
+
+	private requestGracefulRestart(reason: string): void {
+		this.plugin.logger.info(`${reason}. Triggering AWAKE restart...`);
+		process.exitCode = AWAKE_EXIT_CODE;
+		setTimeout(() => {
+			process.emit('SIGTERM');
+		}, 1000);
+	}
+}
+
+function getDateString(): string {
+	const now = new Date();
+	const pad = (value: number) => String(value).padStart(2, '0');
+	return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }

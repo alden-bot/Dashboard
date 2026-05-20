@@ -1,4 +1,5 @@
 import type { I18nManager } from '@/api';
+import { escapeAttr, escapeHtml } from '../utils/html';
 
 export function renderLayout(
 	title: string,
@@ -48,6 +49,12 @@ export function renderLayout(
 			id: 'feed',
 			icon: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z',
 		},
+		{
+			href: '/ops',
+			label: 'Ops',
+			id: 'ops',
+			icon: 'M13 10V3L4 14h7v7l9-11h-7z',
+		},
 	];
 
 	const allItems = isAdmin ? [...navItems, ...adminItems] : navItems;
@@ -69,36 +76,13 @@ export function renderLayout(
 		.join('');
 
 	return `<!DOCTYPE html>
-<html lang="${lang}" class="h-full">
+<html lang="${escapeAttr(lang)}" class="h-full">
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>${title} - Alden Bot Dashboard</title>
-	<script src="https://cdn.tailwindcss.com/3.4.1"></script>
-	<script src="https://unpkg.com/htmx.org@2.0.4"></script>
-	<script>
-		tailwind.config = {
-			theme: {
-				extend: {
-					colors: {
-						dark: {
-							700: '#1f2937',
-							800: '#111827',
-							900: '#030712',
-						}
-					}
-				}
-			}
-		}
-	</script>
-	<style>
-		::-webkit-scrollbar { width: 6px; }
-		::-webkit-scrollbar-track { background: #1f2937; }
-		::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
-		::-webkit-scrollbar-thumb:hover { background: #6b7280; }
-		.toast-success { background: #065f46; border: 1px solid #10b981; color: #d1fae5; }
-		.toast-error { background: #7f1d1d; border: 1px solid #ef4444; color: #fecaca; }
-	</style>
+	<title>${escapeHtml(title)} - alden-bot Dashboard</title>
+	<link rel="stylesheet" href="/assets/dashboard.css">
+	<script defer src="/assets/dashboard.js"></script>
 </head>
 <body class="h-full bg-gray-950 text-gray-100 overflow-hidden">
 	<div class="flex h-full">
@@ -109,7 +93,7 @@ export function renderLayout(
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
 					</svg>
 				</button>
-				<h1 class="text-base font-semibold text-white">Alden Bot</h1>
+				<h1 class="text-base font-semibold text-white">alden-bot</h1>
 			</div>
 			<button hx-post="/api/logout" class="p-1.5 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white">
 				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -122,7 +106,7 @@ export function renderLayout(
 
 		<aside id="sidebar" class="fixed md:static inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-gray-900 to-gray-950 border-r border-gray-800 flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-200">
 			<div class="p-5 border-b border-gray-800/80">
-				<h1 class="text-lg font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">Alden Bot</h1>
+				<h1 class="text-lg font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">alden-bot</h1>
 				<p class="text-xs text-gray-500 mt-0.5">Dashboard</p>
 			</div>
 			<nav class="flex-1 p-3 space-y-1 overflow-y-auto">
@@ -145,27 +129,6 @@ export function renderLayout(
 		</main>
 	</div>
 
-	<script>
-		function toggleSidebar() {
-			const sidebar = document.getElementById('sidebar');
-			const overlay = document.getElementById('sidebar-overlay');
-			sidebar.classList.toggle('-translate-x-full');
-			overlay.classList.toggle('hidden');
-		}
-
-		document.addEventListener('htmx:configRequest', (e) => {
-			const match = document.cookie.match(/csrf_token=([^;]+)/);
-			if (match) {
-				e.detail.headers['X-CSRF-Token'] = match[1];
-			}
-		});
-
-		document.body.addEventListener('htmx:afterSwap', (e) => {
-			if (e.detail.target?.id === 'action-result') {
-				setTimeout(() => location.reload(), 1500);
-			}
-		});
-	</script>
 </body>
 </html>`;
 }

@@ -1,4 +1,5 @@
 import { readJsonFileAsync, writeJsonFileAsync } from '@/api';
+import { Role } from '@/api';
 import type Main from '../main';
 
 interface GroupEntry {
@@ -24,18 +25,17 @@ export class GroupTracker {
 	) {}
 
 	public async load(): Promise<void> {
-		// Load saved groups from disk
 		const data = await readJsonFileAsync<GroupFile>(this.dataPath);
 		if (data?.groups) {
 			for (const [threadId, entry] of Object.entries(data.groups)) {
-				this.groups.set(threadId, entry);
+				if (isGroupEntry(entry)) {
+					this.groups.set(threadId, entry);
+				}
 			}
 		}
 
-		// Fetch all groups from API
 		await this.refreshGroups();
 
-		// Refresh every 10 minutes
 		this.refreshTimer = setInterval(
 			() => {
 				void this.refreshGroups();
@@ -126,9 +126,24 @@ export class GroupTracker {
 	 * Get group IDs that a user manages (is creator or admin of).
 	 */
 	public async getGroupsForUser(userId: string): Promise<string[]> {
+		return this.getManageableGroupsForUser(userId);
+	}
+
+	public async getManageableGroupsForUser(userId: string): Promise<string[]> {
+		if (this.plugin.bot.config.ADMIN_IDS.includes(userId)) {
+			return this.getAllGroupIds();
+		}
+
 		const managedGroups: string[] = [];
 		const threadIds = Array.from(this.groups.keys());
 		if (threadIds.length === 0) return managedGroups;
+
+		const managed = new Set<string>();
+		for (const threadId of threadIds) {
+			if (this.plugin.bot.permissionManager.isVirtualDeputy(threadId, userId)) {
+				managed.add(threadId);
+			}
+		}
 
 		try {
 			const info = await this.plugin.bot.api.getGroupInfo(threadIds);
@@ -137,7 +152,7 @@ export class GroupTracker {
 				const group = info.gridInfoMap[threadId];
 				if (group) {
 					if (group.creatorId === userId || group.adminIds?.includes(userId)) {
-						managedGroups.push(threadId);
+						managed.add(threadId);
 					}
 				}
 			}
@@ -145,6 +160,16 @@ export class GroupTracker {
 			this.plugin.logger.error('GroupTracker: Failed to get group info for user', error);
 		}
 
-		return managedGroups;
+		return Array.from(managed);
 	}
+
+	public async getRoleForUser(userId: string, threadId: string): Promise<Role> {
+		return this.plugin.bot.permissionManager.getRoleLevel(threadId, userId, true);
+	}
+}
+
+function isGroupEntry(value: unknown): value is GroupEntry {
+	if (!value || typeof value !== 'object') return false;
+	const candidate = value as Partial<GroupEntry>;
+	return typeof candidate.firstSeen === 'number' && typeof candidate.lastSeen === 'number';
 }

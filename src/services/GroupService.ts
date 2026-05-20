@@ -1,6 +1,5 @@
 import path from 'node:path';
-import { readJsonFileAsync, writeJsonFileAsync } from '@/api';
-import type { GroupMemberProfile } from 'zca-js';
+import { readJsonFileAsync, Role, writeJsonFileAsync } from '@/api';
 import type Main from '../main';
 
 export interface GroupInfo {
@@ -17,14 +16,24 @@ export interface GroupMember {
 	userId: string;
 	displayName: string;
 	avatar: string;
+	role: 'botAdmin' | 'leader' | 'deputy' | 'virtualDeputy' | 'bot' | 'member';
+	roleLevel: Role;
+	canBeModerated: boolean;
 	isCreator: boolean;
-	isAdmin: boolean;
-	isDeputy: boolean;
+	isZaloDeputy: boolean;
+	isVirtualDeputy: boolean;
+	isBotAdmin: boolean;
 	isBot: boolean;
 }
 
 interface GroupLinksFile {
 	links: Record<string, string>;
+}
+
+interface MemberProfile {
+	displayName?: string;
+	zaloName?: string;
+	avatar?: string;
 }
 
 /**
@@ -47,7 +56,9 @@ export class GroupService {
 		const data = await readJsonFileAsync<GroupLinksFile>(this.linksPath);
 		if (data?.links) {
 			for (const [threadId, link] of Object.entries(data.links)) {
-				this.groupLinks.set(threadId, link);
+				if (typeof link === 'string') {
+					this.groupLinks.set(threadId, link);
+				}
 			}
 		}
 	}
@@ -71,7 +82,7 @@ export class GroupService {
 
 		try {
 			const { profile } = await this.plugin.bot.api.fetchAccountInfo();
-			this.botUserId = profile.userId;
+			this.botUserId = profile.userId ?? '';
 			return this.botUserId;
 		} catch (error) {
 			this.plugin.logger.error('Failed to get bot own ID', error);
@@ -86,11 +97,16 @@ export class GroupService {
 		threadId: string,
 		group: { name?: string; memVerList?: string[]; creatorId?: string; adminIds?: string[] },
 	): GroupInfo {
+		const memberIds =
+			group.memVerList
+				?.map((uid) => uid.split('_')[0])
+				.filter((uid): uid is string => typeof uid === 'string' && uid.length > 0) ?? [];
+
 		return {
 			threadId,
 			name: group.name || 'Unknown',
 			memberCount: group.memVerList?.length || 0,
-			memberIds: group.memVerList ? group.memVerList.map((uid) => uid.split('_')[0]).filter((uid): uid is string => uid !== undefined) : [],
+			memberIds,
 			creatorId: group.creatorId || '',
 			adminIds: group.adminIds || [],
 			isTracked: true,
@@ -153,10 +169,10 @@ export class GroupService {
 				const info = await this.plugin.bot.api.getGroupInfo(threadId);
 				const group = info.gridInfoMap[threadId];
 				if (!group?.memVerList) return [];
-				
+
 				uids = group.memVerList
 					.map((uid) => uid.split('_')[0])
-					.filter((uid): uid is string => uid !== undefined);
+					.filter((uid): uid is string => typeof uid === 'string' && uid.length > 0);
 				creatorId = group.creatorId || '';
 				adminIds = group.adminIds || [];
 			}
@@ -166,10 +182,10 @@ export class GroupService {
 			const botId = await this.getBotUserId();
 
 			// Use getGroupMembersInfo for accurate member data
-			let profiles: Record<string, GroupMemberProfile> = {};
+			let profiles: Record<string, MemberProfile> = {};
 			try {
 				const membersInfo = await this.plugin.bot.api.getGroupMembersInfo(uids);
-				profiles = membersInfo.profiles;
+				profiles = membersInfo.profiles as Record<string, MemberProfile>;
 			} catch (error) {
 				this.plugin.logger.warn(
 					'Failed to fetch group members info, using fallback names',
@@ -180,15 +196,33 @@ export class GroupService {
 			return uids.map((uid) => {
 				const profile = profiles[uid];
 				const isBot = uid === botId;
+				const isBotAdmin = this.plugin.bot.config.ADMIN_IDS.includes(uid);
+				const isCreator = creatorId === uid;
+				const isZaloDeputy = adminIds.includes(uid);
+				const isVirtualDeputy = this.plugin.bot.permissionManager.isVirtualDeputy(
+					threadId,
+					uid,
+				);
+				const role = getMemberRole({
+					isBot,
+					isBotAdmin,
+					isCreator,
+					isZaloDeputy,
+					isVirtualDeputy,
+				});
 
 				return {
 					userId: uid,
 					displayName:
 						profile?.displayName || profile?.zaloName || `User ${uid.slice(-6)}`,
 					avatar: profile?.avatar || '',
-					isCreator: creatorId === uid,
-					isAdmin: adminIds.includes(uid),
-					isDeputy: false,
+					role,
+					roleLevel: getMemberRoleLevel(role),
+					canBeModerated: role === 'member',
+					isCreator,
+					isZaloDeputy,
+					isVirtualDeputy,
+					isBotAdmin,
 					isBot,
 				};
 			});
@@ -196,6 +230,15 @@ export class GroupService {
 			this.plugin.logger.error(`Failed to get group members for ${threadId}`, error);
 			return [];
 		}
+	}
+
+	public async getGroupMember(
+		threadId: string,
+		userId: string,
+		groupInfo?: GroupInfo,
+	): Promise<GroupMember | undefined> {
+		const members = await this.getGroupMembers(threadId, groupInfo);
+		return members.find((member) => member.userId === userId);
 	}
 
 	/**
@@ -287,5 +330,35 @@ export class GroupService {
 			this.plugin.logger.error(`Failed to disable link for ${threadId}`, error);
 			return false;
 		}
+	}
+}
+
+function getMemberRole(flags: {
+	isBot: boolean;
+	isBotAdmin: boolean;
+	isCreator: boolean;
+	isZaloDeputy: boolean;
+	isVirtualDeputy: boolean;
+}): GroupMember['role'] {
+	if (flags.isBot) return 'bot';
+	if (flags.isBotAdmin) return 'botAdmin';
+	if (flags.isCreator) return 'leader';
+	if (flags.isZaloDeputy) return 'deputy';
+	if (flags.isVirtualDeputy) return 'virtualDeputy';
+	return 'member';
+}
+
+function getMemberRoleLevel(role: GroupMember['role']): Role {
+	switch (role) {
+		case 'botAdmin':
+			return Role.BotAdmin;
+		case 'leader':
+			return Role.Leader;
+		case 'deputy':
+		case 'virtualDeputy':
+			return Role.Deputy;
+		case 'bot':
+		case 'member':
+			return Role.Member;
 	}
 }

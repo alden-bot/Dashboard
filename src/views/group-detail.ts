@@ -1,216 +1,247 @@
 import type { I18nManager } from '@/api';
+import { Role } from '@/api';
 import type { GroupInfo, GroupMember } from '../services/GroupService';
 import { renderLayout } from './layout';
-import { escapeHtml } from '../utils/html';
+import { escapeAttr, escapeHtml, escapeUrl } from '../utils/html';
 
-export function renderInviteCard(threadId: string, savedLink?: string): string {
-	return `
-		<div id="invite-card" class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-lg">
-			<h3 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Invite Link</h3>
-			${
-				savedLink
-					? `
-				<div class="p-3 bg-gray-800 rounded-lg mb-3">
-					<p class="text-xs text-gray-400 mb-1">Current Link:</p>
-					<p class="text-sm text-indigo-400 break-all">${escapeHtml(savedLink)}</p>
-				</div>
-			`
-					: ''
-			}
-			<div class="flex gap-2">
-				<button hx-post="/groups/${threadId}/link/enable" hx-swap="outerHTML" hx-target="#invite-card"
-					class="flex-1 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition-colors">
+export interface GroupDetailAccess {
+	isBotAdmin: boolean;
+	actorRole: Role;
+	canManageSettings: boolean;
+	canManageVirtualDeputies: boolean;
+}
+
+export function renderInviteCard(
+	threadId: string,
+	savedLink?: string,
+	canManageSettings = true,
+): string {
+	const controls = canManageSettings
+		? `
+			<div class="action-row">
+				<button hx-post="/groups/${escapeAttr(threadId)}/link/enable" hx-swap="outerHTML" hx-target="#invite-card" class="btn btn-secondary">
 					${savedLink ? 'New Link' : 'Enable'}
 				</button>
 				${
 					savedLink
 						? `
-					<button hx-post="/groups/${threadId}/link/refresh" hx-swap="outerHTML" hx-target="#invite-card"
-						class="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition-colors">
+					<button hx-post="/groups/${escapeAttr(threadId)}/link/refresh" hx-swap="outerHTML" hx-target="#invite-card" class="btn btn-secondary">
 						Refresh
-					</button>
-				`
+					</button>`
 						: ''
 				}
-				<button hx-post="/groups/${threadId}/link/disable" hx-swap="outerHTML" hx-target="#invite-card"
-					class="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition-colors">
+				<button hx-post="/groups/${escapeAttr(threadId)}/link/disable" hx-swap="outerHTML" hx-target="#invite-card" class="btn btn-secondary">
 					Disable
 				</button>
-			</div>
+			</div>`
+		: `<p class="muted">You can view this group but cannot change invite links.</p>`;
+
+	return `
+		<div id="invite-card" class="panel">
+			<h3>Invite Link</h3>
+			${
+				savedLink
+					? `
+				<div class="code-block">
+					<p class="muted">Current Link</p>
+					<p class="break-all">${escapeHtml(savedLink)}</p>
+				</div>`
+					: `<p class="muted">No saved invite link.</p>`
+			}
+			${controls}
 		</div>`;
 }
 
 export function renderGroupDetail(
 	group: GroupInfo,
 	members: GroupMember[],
-	isAdmin: boolean,
+	access: GroupDetailAccess,
 	i18n: I18nManager,
 	lang: string,
 	savedLink?: string,
 ): string {
-	const roleColors: Record<string, string> = {
-		Leader: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-		Deputy: 'bg-red-500/20 text-red-400 border-red-500/30',
-		vDeputy: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-		Bot: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-		Member: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
-	};
-
-	const memberRows = members
-		.map((m) => {
-			let role = 'Member';
-			if (m.isCreator) role = 'Leader';
-			else if (m.isAdmin) role = 'Deputy';
-			else if (m.isDeputy) role = 'vDeputy';
-			else if (m.isBot) role = 'Bot';
-
-			const badgeClass = roleColors[role] || roleColors['Member'];
-			const botTag = m.isBot
-				? '<span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-600 text-white">BOT</span>'
-				: '';
-
-			const isMember = role === 'Member';
-
-			const actions = isMember
-				? `
-				<div class="flex gap-1">
-					<button
-						hx-post="/groups/${group.threadId}/deputies/${m.userId}/add"
-						hx-confirm="Grant vDeputy to ${escapeHtml(m.displayName)}?"
-						hx-swap="innerHTML"
-						hx-target="#action-result"
-						class="px-2 py-1 text-xs bg-indigo-900/50 hover:bg-indigo-900 text-indigo-400 rounded transition-colors"
-					>Grant vDeputy</button>
-					<button
-						hx-post="/groups/${group.threadId}/members/${m.userId}/kick"
-						hx-confirm="Kick ${escapeHtml(m.displayName)}?"
-						hx-swap="innerHTML"
-						hx-target="#action-result"
-						class="px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors"
-					>Kick</button>
-					<button
-						hx-post="/groups/${group.threadId}/members/${m.userId}/ban"
-						hx-confirm="Ban ${escapeHtml(m.displayName)}?"
-						hx-swap="innerHTML"
-						hx-target="#action-result"
-						class="px-2 py-1 text-xs bg-red-900/50 hover:bg-red-900 text-red-400 rounded transition-colors"
-					>Ban</button>
-					<button
-						hx-get="/groups/${group.threadId}/members/${m.userId}/detail"
-						hx-swap="innerHTML"
-						hx-target="#member-detail-${m.userId}"
-						class="px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors"
-					>Details</button>
-				</div>`
-				: `
-				<div class="flex gap-1">
-					<button
-						hx-get="/groups/${group.threadId}/members/${m.userId}/detail"
-						hx-swap="innerHTML"
-						hx-target="#member-detail-${m.userId}"
-						class="px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors"
-					>Details</button>
-				</div>`;
-
-			const avatarHtml = m.avatar
-				? `<img src="${escapeHtml(m.avatar)}" alt="" class="w-8 h-8 rounded-full object-cover flex-shrink-0">`
-				: `<div class="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center text-xs font-bold text-gray-300 flex-shrink-0">
-					${m.isBot ? '🤖' : escapeHtml(m.displayName).charAt(0).toUpperCase()}
-				</div>`;
-
-			return `
-			<tr class="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
-				<td class="px-4 py-3">
-					<div class="flex items-center gap-3">
-						${avatarHtml}
-						<div>
-							<div class="flex items-center">
-								<span class="text-gray-200 text-sm">${escapeHtml(m.displayName)}</span>
-								${botTag}
-							</div>
-							<span class="text-gray-600 text-xs font-mono">${m.userId}</span>
-						</div>
-					</div>
-				</td>
-				<td class="px-4 py-3">
-					<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${badgeClass}">
-						${escapeHtml(role)}
-					</span>
-				</td>
-				<td class="px-4 py-3 text-right">${actions}</td>
-			</tr>
-			<tr>
-				<td colspan="3" class="px-4 py-0">
-					<div id="member-detail-${m.userId}" class="pb-2"></div>
-				</td>
-			</tr>`;
-		})
-		.join('');
+	const memberRows = members.map((member) => renderMemberRows(group, member, access)).join('');
+	const actorRole = getRoleLabelFromLevel(access.actorRole);
 
 	const content = `
-		<div class="mb-6">
-			<a href="/groups" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">&larr; Back to groups</a>
-			<h1 class="text-2xl font-bold text-white mt-2">${escapeHtml(group.name)}</h1>
-			<p class="text-gray-500 text-sm mt-1">${group.memberCount} members</p>
+		<div class="page-heading">
+			<a href="/groups" class="muted-link">&larr; Back to groups</a>
+			<h1>${escapeHtml(group.name)}</h1>
+			<p>${group.memberCount} members · Your access: ${escapeHtml(actorRole)}</p>
 		</div>
 
-		<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-			<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-lg">
-				<h3 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Group Info</h3>
-				<div class="space-y-2 text-sm">
-					<div class="flex justify-between">
-						<span class="text-gray-500">Thread ID</span>
-						<span class="text-gray-300 font-mono text-xs">${group.threadId}</span>
-					</div>
-					<div class="flex justify-between">
-						<span class="text-gray-500">Creator</span>
-						<span class="text-gray-300 font-mono text-xs">${group.creatorId}</span>
-					</div>
-					<div class="flex justify-between">
-						<span class="text-gray-500">Admins</span>
-						<span class="text-gray-300">${group.adminIds.length}</span>
-					</div>
+		<div class="grid grid-3">
+			<div class="panel">
+				<h3>Group Info</h3>
+				<div class="kv"><span>Thread ID</span><code>${escapeHtml(group.threadId)}</code></div>
+				<div class="kv"><span>Creator</span><code>${escapeHtml(group.creatorId)}</code></div>
+				<div class="kv"><span>Deputies</span><strong>${group.adminIds.length}</strong></div>
+			</div>
+
+			<div class="panel">
+				<h3>Change Name</h3>
+				${
+					access.canManageSettings
+						? `
+					<form hx-post="/groups/${escapeAttr(group.threadId)}/name" hx-swap="innerHTML" hx-target="#name-result" class="inline-form">
+						<input type="text" name="name" placeholder="New name" required>
+						<button type="submit" class="btn btn-primary">Save</button>
+					</form>
+					<div id="name-result"></div>`
+						: `<p class="muted">You cannot change this group.</p>`
+				}
+			</div>
+
+			${renderInviteCard(group.threadId, savedLink, access.canManageSettings)}
+		</div>
+
+		<div id="action-result"></div>
+
+		<div class="panel">
+			<div class="panel-header">
+				<div>
+					<h3>Members</h3>
+					<p>${members.length} total</p>
 				</div>
+				<input id="member-filter" type="search" placeholder="Search members" data-filter-table="#members-table">
 			</div>
-
-			<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-lg">
-				<h3 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Change Name</h3>
-				<form hx-post="/groups/${group.threadId}/name" hx-swap="innerHTML" hx-target="#name-result" class="flex gap-2">
-					<input type="text" name="name" placeholder="New name" required
-						class="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-					<button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition-colors">
-						Save
-					</button>
-				</form>
-				<div id="name-result" class="mt-2"></div>
-			</div>
-
-			${renderInviteCard(group.threadId, savedLink)}
-		</div>
-
-		<div id="action-result" class="mb-4"></div>
-
-		<div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-lg">
-			<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-				<h3 class="text-sm font-medium text-gray-400">Members</h3>
-				<span class="text-xs text-gray-600">${members.length} total</span>
-			</div>
-			<div class="overflow-x-auto">
-				<table class="w-full">
+			<div class="table-wrap">
+				<table id="members-table">
 					<thead>
-						<tr class="border-b border-gray-800 text-left">
-							<th class="px-4 py-3 text-xs font-medium text-gray-500 uppercase">User</th>
-							<th class="px-4 py-3 text-xs font-medium text-gray-500 uppercase">Role</th>
-							<th class="px-4 py-3 text-xs font-medium text-gray-500 uppercase text-right">Actions</th>
+						<tr>
+							<th>User</th>
+							<th>Role</th>
+							<th class="align-right">Actions</th>
 						</tr>
 					</thead>
 					<tbody>
-						${memberRows || '<tr><td colspan="3" class="px-4 py-8 text-center text-gray-500">No members found</td></tr>'}
+						${memberRows || '<tr><td colspan="3" class="empty">No members found</td></tr>'}
 					</tbody>
 				</table>
 			</div>
 		</div>
 	`;
 
-	return renderLayout(group.name, content, i18n, lang, isAdmin, 'groups');
+	return renderLayout(group.name, content, i18n, lang, access.isBotAdmin, 'groups');
+}
+
+function renderMemberRows(
+	group: GroupInfo,
+	member: GroupMember,
+	access: GroupDetailAccess,
+): string {
+	const role = getRoleLabel(member);
+	const actions = renderMemberActions(group.threadId, member, access);
+	const avatar = renderAvatar(member);
+	const searchText = `${member.displayName} ${member.userId} ${role}`.toLowerCase();
+
+	return `
+		<tr data-filter-text="${escapeAttr(searchText)}">
+			<td>
+				<div class="identity">
+					${avatar}
+					<div>
+						<div class="identity-name">${escapeHtml(member.displayName)}</div>
+						<code>${escapeHtml(member.userId)}</code>
+					</div>
+				</div>
+			</td>
+			<td><span class="badge badge-${escapeAttr(member.role)}">${escapeHtml(role)}</span></td>
+			<td class="align-right">${actions}</td>
+		</tr>
+		<tr data-filter-text="${escapeAttr(searchText)}">
+			<td colspan="3"><div id="member-detail-${escapeAttr(member.userId)}"></div></td>
+		</tr>`;
+}
+
+function renderMemberActions(
+	threadId: string,
+	member: GroupMember,
+	access: GroupDetailAccess,
+): string {
+	const detailsButton = `
+		<button
+			hx-get="/groups/${escapeAttr(threadId)}/members/${escapeAttr(member.userId)}/detail"
+			hx-swap="innerHTML"
+			hx-target="#member-detail-${escapeAttr(member.userId)}"
+			class="btn btn-secondary btn-small"
+		>Details</button>`;
+
+	const actionButtons: string[] = [detailsButton];
+
+	if (member.role === 'member' && access.canManageVirtualDeputies) {
+		actionButtons.unshift(`
+			<button
+				hx-post="/groups/${escapeAttr(threadId)}/deputies/${escapeAttr(member.userId)}/add"
+				hx-confirm="Grant vDeputy to ${escapeAttr(member.displayName)}?"
+				hx-swap="innerHTML"
+				hx-target="#action-result"
+				class="btn btn-primary btn-small"
+			>Grant vDeputy</button>`);
+	}
+
+	if (member.role === 'virtualDeputy' && access.canManageVirtualDeputies) {
+		actionButtons.unshift(`
+			<button
+				hx-post="/groups/${escapeAttr(threadId)}/deputies/${escapeAttr(member.userId)}/remove"
+				hx-confirm="Remove vDeputy from ${escapeAttr(member.displayName)}?"
+				hx-swap="innerHTML"
+				hx-target="#action-result"
+				class="btn btn-warning btn-small"
+			>Remove vDeputy</button>`);
+	}
+
+	if (member.canBeModerated && access.canManageSettings) {
+		actionButtons.splice(
+			1,
+			0,
+			`
+			<button
+				hx-post="/groups/${escapeAttr(threadId)}/members/${escapeAttr(member.userId)}/kick"
+				hx-confirm="Kick ${escapeAttr(member.displayName)}?"
+				hx-swap="innerHTML"
+				hx-target="#action-result"
+				class="btn btn-secondary btn-small"
+			>Kick</button>
+			<button
+				hx-post="/groups/${escapeAttr(threadId)}/members/${escapeAttr(member.userId)}/ban"
+				hx-confirm="Ban ${escapeAttr(member.displayName)}?"
+				hx-swap="innerHTML"
+				hx-target="#action-result"
+				class="btn btn-danger btn-small"
+			>Ban</button>`,
+		);
+	}
+
+	return `<div class="action-row align-end">${actionButtons.join('')}</div>`;
+}
+
+function renderAvatar(member: GroupMember): string {
+	if (member.avatar) {
+		return `<img src="${escapeUrl(member.avatar)}" alt="" class="avatar">`;
+	}
+
+	const label = member.isBot ? 'B' : member.displayName.charAt(0).toUpperCase();
+	return `<div class="avatar avatar-fallback">${escapeHtml(label)}</div>`;
+}
+
+function getRoleLabel(member: GroupMember): string {
+	switch (member.role) {
+		case 'botAdmin':
+			return 'BotAdmin';
+		case 'leader':
+			return 'Leader';
+		case 'deputy':
+			return 'Deputy';
+		case 'virtualDeputy':
+			return 'vDeputy';
+		case 'bot':
+			return 'Bot';
+		case 'member':
+			return 'Member';
+	}
+}
+
+function getRoleLabelFromLevel(role: Role): string {
+	return Role[role] ?? 'Member';
 }

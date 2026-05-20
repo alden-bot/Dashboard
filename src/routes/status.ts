@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type Main from '../main';
-import { requireAuth } from '../auth/middleware';
+import { requireAdmin, requireAuth } from '../auth/middleware';
 import { renderStatus } from '../views/status';
 import { renderDashboard } from '../views/dashboard';
 import { Role } from '@/api';
@@ -8,7 +8,7 @@ import { Role } from '@/api';
 export function createStatusRoutes(plugin: Main): Hono {
 	const app = new Hono();
 
-	app.use('/status', requireAuth);
+	app.use('/status', requireAdmin);
 	app.use('/dashboard', requireAuth);
 
 	app.get('/status', (c) => {
@@ -26,7 +26,9 @@ export function createStatusRoutes(plugin: Main): Hono {
 
 		const isAdmin = session.role >= Role.BotAdmin;
 		const status = plugin.botService.getStatus();
-		const groupCount = plugin.groupTracker.getAllGroupIds().length;
+		const groupCount = isAdmin
+			? plugin.groupTracker.getAllGroupIds().length
+			: session.groupIds.length;
 
 		return c.html(
 			renderDashboard(status, groupCount, plugin.i18n!, plugin.bot.config.LANGUAGE, isAdmin),

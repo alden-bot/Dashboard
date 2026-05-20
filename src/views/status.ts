@@ -1,6 +1,7 @@
 import type { I18nManager } from '@/api';
 import type { BotStatus } from '../services/BotService';
 import { renderLayout } from './layout';
+import { escapeHtml } from '../utils/html';
 
 export function renderStatus(
 	status: BotStatus,
@@ -21,11 +22,11 @@ export function renderStatus(
 		<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
 			<div class="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-lg">
 				<div class="text-gray-500 text-xs mb-1">Version</div>
-				<div class="text-white font-bold text-lg">v${status.version}</div>
+				<div class="text-white font-bold text-lg">v${escapeHtml(status.version)}</div>
 			</div>
 			<div class="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-lg">
 				<div class="text-gray-500 text-xs mb-1">Uptime</div>
-				<div class="text-white font-bold text-lg">${status.uptimeFormatted}</div>
+				<div class="text-white font-bold text-lg">${escapeHtml(status.uptimeFormatted)}</div>
 			</div>
 			<div class="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-lg">
 				<div class="text-gray-500 text-xs mb-1">Plugins</div>
@@ -69,25 +70,25 @@ export function renderStatus(
 				<div class="space-y-2">
 					<div class="flex justify-between py-1.5 border-b border-gray-800">
 						<span class="text-gray-500 text-sm">OS</span>
-						<span class="text-gray-300 text-sm">${status.os.type}</span>
+						<span class="text-gray-300 text-sm">${escapeHtml(status.os.type)}</span>
 					</div>
 					<div class="flex justify-between py-1.5 border-b border-gray-800">
 						<span class="text-gray-500 text-sm">Release</span>
-						<span class="text-gray-300 text-sm">${status.os.release}</span>
+						<span class="text-gray-300 text-sm">${escapeHtml(status.os.release)}</span>
 					</div>
 					<div class="flex justify-between py-1.5 border-b border-gray-800">
 						<span class="text-gray-500 text-sm">Architecture</span>
-						<span class="text-gray-300 text-sm">${status.os.arch}</span>
+						<span class="text-gray-300 text-sm">${escapeHtml(status.os.arch)}</span>
 					</div>
 				</div>
 				<div class="space-y-2">
 					<div class="flex justify-between py-1.5 border-b border-gray-800">
 						<span class="text-gray-500 text-sm">Node.js</span>
-						<span class="text-gray-300 text-sm">${status.node}</span>
+						<span class="text-gray-300 text-sm">${escapeHtml(status.node)}</span>
 					</div>
 					<div class="flex justify-between py-1.5 border-b border-gray-800">
 						<span class="text-gray-500 text-sm">CPU</span>
-						<span class="text-gray-300 text-sm truncate ml-4">${status.cpu}</span>
+						<span class="text-gray-300 text-sm truncate ml-4">${escapeHtml(status.cpu)}</span>
 					</div>
 					<div class="flex justify-between py-1.5 border-b border-gray-800">
 						<span class="text-gray-500 text-sm">RSS Memory</span>

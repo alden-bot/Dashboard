@@ -1,7 +1,7 @@
 {
 	"name": "Dashboard",
 	"version": "1.0.0",
-	"description": "Web dashboard for managing Alden Bot and groups",
+	"description": "Web dashboard for managing alden-bot and groups",
 	"author": "finntrannn",
 	"main": "src/main.ts",
 	"apiVersion": "1.0.0",

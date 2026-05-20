@@ -17,24 +17,35 @@ import { createPermissionRoutes } from './routes/permissions';
 import { createConfigRoutes } from './routes/config';
 import { createStatusRoutes } from './routes/status';
 import { createSSERoutes } from './routes/sse';
+import { createOpsRoutes } from './routes/ops';
+import { createAssetRoutes } from './routes/assets';
 import { renderLogin } from './views/login';
+import { LoginRateLimiter } from './auth/LoginRateLimiter';
 
 export type DashboardConfig = {
 	port: number;
 	host: string;
+	publicUrl: string;
+	secureCookies: boolean;
+	trustProxy: boolean;
 	sessionTTL: number;
 	otpTTL: number;
 	maxSessions: number;
 	feedBufferSize: number;
+	logTailLines: number;
 };
 
 const DEFAULT_CONFIG: DashboardConfig = {
 	port: 3000,
 	host: '0.0.0.0',
-	sessionTTL: 7 * 24 * 60 * 60 * 1000, // 7 days
-	otpTTL: 5 * 60 * 1000, // 5 min
+	publicUrl: '',
+	secureCookies: false,
+	trustProxy: false,
+	sessionTTL: 7 * 24 * 60 * 60 * 1000,
+	otpTTL: 5 * 60 * 1000,
 	maxSessions: 50,
 	feedBufferSize: 100,
+	logTailLines: 200,
 };
 
 export default class Main extends PluginBase {
@@ -44,6 +55,7 @@ export default class Main extends PluginBase {
 	public groupTracker!: GroupTracker;
 	public groupService!: GroupService;
 	public botService!: BotService;
+	public loginRateLimiter!: LoginRateLimiter;
 
 	private server?: ReturnType<typeof serve>;
 	private app!: Hono;
@@ -76,6 +88,7 @@ export default class Main extends PluginBase {
 			this.logger,
 		);
 		await this.sessionManager.load();
+		this.loginRateLimiter = new LoginRateLimiter(5, 5 * 60 * 1000);
 
 		// Services
 		this.groupTracker = new GroupTracker(this, path.join(this.dataFolder, 'known-groups.json'));
@@ -103,13 +116,13 @@ export default class Main extends PluginBase {
 		const host = this.config.get('host');
 
 		this.server = serve({ fetch: this.app.fetch, port, hostname: host });
-		this.server.on('error', (error: any) => {
+		this.server.on('error', (error: Error) => {
 			this.logger.error(
 				`Failed to start dashboard server on port ${port}. Is the port already in use?`,
 				error,
 			);
 		});
-		
+
 		this.logger.info(`Dashboard server started at http://${host}:${port}`);
 	}
 
@@ -120,6 +133,7 @@ export default class Main extends PluginBase {
 		}
 		this.otpManager.stop();
 		this.sessionManager.stop();
+		this.loginRateLimiter?.stop();
 		this.groupTracker.stop();
 		await this.sessionManager.save();
 		await this.groupTracker.save();
@@ -139,6 +153,8 @@ export default class Main extends PluginBase {
 		this.app.route('/', createConfigRoutes(this));
 		this.app.route('/', createStatusRoutes(this));
 		this.app.route('/', createSSERoutes(this));
+		this.app.route('/', createOpsRoutes(this));
+		this.app.route('/', createAssetRoutes());
 
 		// Root page — redirect to dashboard or show login
 		this.app.get('/', (c) => {
